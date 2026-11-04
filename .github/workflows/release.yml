@@ -68,7 +68,12 @@ jobs:
         run: pnpm --filter "@lynxfita/core" run build
 
       - name: Build TypeScript Packages
-        run: pnpm --filter "./packages/*" run build
+        run: |
+          pnpm --filter "@lynxfita/codegen" run build
+          pnpm --filter "@lynxfita/builder" run build
+          pnpm --filter "@lynxfita/wasi-runtime" run build
+          pnpm --filter "@lynxfita/updater" run build
+          pnpm --filter "@lynxfita/cli" run build
 
       - name: Build Example Packages
         run: pnpm --filter "./examples/*" run build
@@ -180,7 +185,14 @@ jobs:
         run: node scripts/setup-workspace.mjs
 
       - name: Build Monorepo Packages
-        run: pnpm -r run build
+        run: |
+          pnpm --filter "@lynxfita/core" run build
+          pnpm --filter "@lynxfita/codegen" run build
+          pnpm --filter "@lynxfita/builder" run build
+          pnpm --filter "@lynxfita/wasi-runtime" run build
+          pnpm --filter "@lynxfita/updater" run build
+          pnpm --filter "@lynxfita/cli" run build
+          pnpm --filter "./examples/*" run build
 
       - name: Publish Scoped npm Packages to GitHub Packages
         run: |
