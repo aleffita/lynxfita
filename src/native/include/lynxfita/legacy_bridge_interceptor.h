@@ -6,6 +6,7 @@
 #include <functional>
 #include <chrono>
 #include <atomic>
+#include <mutex>
 #include <shared_mutex>
 
 namespace lynxfita {

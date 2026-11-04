@@ -94,6 +94,23 @@ To protect working memory and eliminate token bloat, agentry governance is modul
 - Landing pages (`README.md`) must be clean, elegant, high-retention, and SEO-friendly.
 - **NEVER** dump gigantic, unstyled diagrams onto the main README. Isolate in-depth technical diagrams in dedicated `docs/architecture/` artifacts with proper styling and direct links.
 
+### K. Coordinator Ultimate Liability & Pre-Delegation Dialectical Synthesis
+- **Strict Command Chain Accountability**: The Principal Coordinator (lead agent) bears **100% of the responsibility** for every action, commit, pipeline trigger, and architectural decision executed by any subagent. If a subagent makes an error, violates Gitflow, or delivers shallow work, the entire team fails and the fault lies squarely on the Coordinator.
+- **Zero Blind Forwarding**: The Coordinator MUST NEVER blindly forward a raw user prompt to a worker subagent to "do everything at once".
+- **Mandatory Multi-Turn Orchestration**: Before delegating implementation:
+  1. The Coordinator must personally perform deep epistemological decoupage and structural analysis of the principal's request.
+  2. Dispatch targeted, read-only reconnaissance/verification tasks to subagents first to gather empirical facts.
+  3. Reflect on the findings, design the exact architectural specification, branch strategy, and verification gates.
+  4. Delegate scoped, atomic work packages on isolated feature branches (`feature/*`) and personally audit every diff and CI status before any merge into `develop` or `main`.
+
+### L. Strict Gitflow & CI/CD Pipeline Discipline (Zero Trunk-Based Spam)
+- **Absolute Prohibition of Direct Pushes to `main`**: Agents MUST NEVER push commits directly to `main` (trunk-based commits) or trigger multiple uncoordinated CI/CD runs.
+- **Gitflow Branch Hierarchy**:
+  - `main`: Production-grade, tagged SemVer releases only (`vX.Y.Z`).
+  - `develop`: Integration branch receiving reviewed Pull Requests.
+  - `feature/*`, `fix/*`, `release/*`: Working branches where all local commits and local test validations occur *before* a single push.
+- **CI/CD Concurrency & Gatekeeping**: All GitHub Actions workflows MUST enforce `concurrency` cancellation (`cancel-in-progress: true`), path filtering, and strict PR status checks prior to merge.
+
 ---
 
 ## 3. Subagent Specialization Roster

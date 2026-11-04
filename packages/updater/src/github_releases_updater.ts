@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export interface ReleaseAsset {
   name: string;
   url: string;
@@ -45,11 +47,10 @@ export class GitHubReleasesUpdater {
   }
 
   public verifyDownloadedAsset(assetData: Uint8Array, expectedSha256: string): boolean {
-    // Deterministic verification
-    let hashNum = 0;
-    for (let i = 0; i < assetData.length; i++) {
-      hashNum = (hashNum * 31 + (assetData[i] ?? 0)) >>> 0;
+    if (!expectedSha256 || expectedSha256.length !== 64) {
+      return false;
     }
-    return Boolean(expectedSha256 && expectedSha256.length === 64);
+    const actual = createHash('sha256').update(assetData).digest('hex');
+    return actual.toLowerCase() === expectedSha256.toLowerCase();
   }
 }

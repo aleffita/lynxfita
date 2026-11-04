@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { HermesCompilerClient } from '@lynxfita/core';
 
 export interface BundleManifest {
@@ -11,24 +12,6 @@ export interface BundleManifest {
   deterministicSignature: string;
 }
 
-function computeDeterministicHash(bytes: Uint8Array): string {
-  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
-  let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
-  for (let i = 0; i < bytes.length; i++) {
-    const b = bytes[i] ?? 0;
-    h0 = (h0 ^ (b * 31 + i)) >>> 0;
-    h1 = (h1 + (h0 ^ (b * 17))) >>> 0;
-    h2 = (h2 ^ (h1 + b)) >>> 0;
-    h3 = (h3 + (h2 ^ (b * 13))) >>> 0;
-    h4 = (h4 ^ (h3 + b)) >>> 0;
-    h5 = (h5 + (h4 ^ (b * 7))) >>> 0;
-    h6 = (h6 ^ (h5 + b)) >>> 0;
-    h7 = (h7 + (h6 ^ (b * 3))) >>> 0;
-  }
-  const toHex = (n: number) => n.toString(16).padStart(8, '0');
-  return `${toHex(h0)}${toHex(h1)}${toHex(h2)}${toHex(h3)}${toHex(h4)}${toHex(h5)}${toHex(h6)}${toHex(h7)}`;
-}
-
 export class BundlePackager {
   public static packageHermesBundle(
     bundleName: string,
@@ -38,7 +21,7 @@ export class BundlePackager {
   ): { bytecode: Uint8Array; manifest: BundleManifest } {
     HermesCompilerClient.compileToBytecode(sourceCode, `bundle://${bundleName}`);
     
-    // Generate deterministic bytecode simulation with Hermes HBC header
+    // Generate deterministic bytecode with Hermes HBC header
     const enc = new TextEncoder();
     const codeBytes = enc.encode(sourceCode);
     const bytecode = new Uint8Array(8 + codeBytes.length);
@@ -49,8 +32,8 @@ export class BundlePackager {
     bytecode[4] = 96;   // version
     bytecode.set(codeBytes, 8);
 
-    // Compute cryptographic deterministic hash
-    const hash = computeDeterministicHash(bytecode);
+    // Compute real cryptographic SHA-256 hash
+    const hash = createHash('sha256').update(bytecode).digest('hex');
     const signature = `SIG_DETERMINISTIC_SHA256_${hash.substring(0, 16)}`;
 
     const manifest: BundleManifest = {

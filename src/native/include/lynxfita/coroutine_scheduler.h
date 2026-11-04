@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lynxfita/jsi_types.h"
+#include <coroutine>
 #include <functional>
 #include <memory>
 #include <string>
@@ -10,8 +11,83 @@
 #include <condition_variable>
 #include <queue>
 #include <atomic>
+#include <chrono>
 
 namespace lynxfita {
+
+// ============================================================================
+// Real C++20 Coroutine Generator (<coroutine>)
+// ============================================================================
+
+template <typename T>
+class CoroutineGenerator {
+ public:
+  struct promise_type {
+    T current_value_{};
+    std::exception_ptr exception_{nullptr};
+
+    CoroutineGenerator get_return_object() {
+      return CoroutineGenerator(std::coroutine_handle<promise_type>::from_promise(*this));
+    }
+    std::suspend_always initial_suspend() noexcept { return {}; }
+    std::suspend_always final_suspend() noexcept { return {}; }
+    std::suspend_always yield_value(T value) noexcept {
+      current_value_ = std::move(value);
+      return {};
+    }
+    void return_void() noexcept {}
+    void unhandled_exception() {
+      exception_ = std::current_exception();
+    }
+  };
+
+  using Handle = std::coroutine_handle<promise_type>;
+
+  explicit CoroutineGenerator(Handle handle) : handle_(handle) {}
+  ~CoroutineGenerator() {
+    if (handle_) handle_.destroy();
+  }
+
+  CoroutineGenerator(const CoroutineGenerator&) = delete;
+  CoroutineGenerator& operator=(const CoroutineGenerator&) = delete;
+
+  CoroutineGenerator(CoroutineGenerator&& other) noexcept : handle_(other.handle_) {
+    other.handle_ = nullptr;
+  }
+
+  CoroutineGenerator& operator=(CoroutineGenerator&& other) noexcept {
+    if (this != &other) {
+      if (handle_) handle_.destroy();
+      handle_ = other.handle_;
+      other.handle_ = nullptr;
+    }
+    return *this;
+  }
+
+  bool MoveNext() {
+    if (!handle_ || handle_.done()) return false;
+    handle_.resume();
+    if (handle_.promise().exception_) {
+      std::rethrow_exception(handle_.promise().exception_);
+    }
+    return !handle_.done();
+  }
+
+  const T& GetCurrent() const {
+    return handle_.promise().current_value_;
+  }
+
+  bool IsDone() const {
+    return !handle_ || handle_.done();
+  }
+
+ private:
+  Handle handle_;
+};
+
+// ============================================================================
+// Fiber Coroutine & Multi-threaded Scheduler without GIL
+// ============================================================================
 
 enum class CoroutineState {
   Suspended,
@@ -24,6 +100,14 @@ struct CoroutineYieldResult {
   CoroutineState state;
   JsiValueVariant value;
   bool is_done;
+  std::string error_message;
+};
+
+struct WorkerExecutionRecord {
+  std::string task_name;
+  std::thread::id thread_id;
+  uint64_t duration_ns{0};
+  bool success{true};
   std::string error_message;
 };
 
@@ -64,8 +148,14 @@ class CoroutineScheduler {
   // Synchronously step a coroutine
   CoroutineYieldResult StepCoroutine(const std::string& name);
 
-  // Run a coroutine to completion across native worker threads without GIL
+  // Run a coroutine to completion
   std::vector<CoroutineYieldResult> RunToCompletion(const std::string& name);
+
+  // Dispatch parallel work across worker threads without GIL, awaiting completion and tracking thread IDs
+  std::vector<WorkerExecutionRecord> DispatchParallelAll(
+      const std::vector<std::pair<std::string, std::function<void()>>>& tasks);
+
+  std::vector<WorkerExecutionRecord> GetLastExecutionRecords() const;
 
   size_t GetActiveWorkerCount() const { return workers_.size(); }
 
@@ -77,6 +167,9 @@ class CoroutineScheduler {
   mutable std::mutex queue_mutex_;
   std::condition_variable cv_;
   std::atomic<bool> stop_flag_{false};
+
+  mutable std::mutex records_mutex_;
+  std::vector<WorkerExecutionRecord> last_records_;
 
   void WorkerLoop();
 };

@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(Threads REQUIRED)
+
 # Include paths
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -26,6 +28,10 @@ target_include_directories(lynxfita_native PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+target_link_libraries(lynxfita_native PUBLIC
+    Threads::Threads
+)
+
 # LynxFita Native Test Runner Executable
 enable_testing()
 
@@ -35,6 +41,7 @@ add_executable(lynxfita_native_tests
 
 target_link_libraries(lynxfita_native_tests PRIVATE
     lynxfita_native
+    Threads::Threads
 )
 
 add_test(NAME LynxFitaNativeTests COMMAND lynxfita_native_tests)

@@ -1,5 +1,6 @@
 #include "lynxfita/coroutine_scheduler.h"
 #include <iostream>
+#include <chrono>
 
 namespace lynxfita {
 
@@ -120,6 +121,79 @@ std::vector<CoroutineYieldResult> CoroutineScheduler::RunToCompletion(const std:
   return history;
 }
 
+std::vector<WorkerExecutionRecord> CoroutineScheduler::DispatchParallelAll(
+    const std::vector<std::pair<std::string, std::function<void()>>>& tasks) {
+  if (tasks.empty()) {
+    return {};
+  }
+
+  struct SyncBatch {
+    std::mutex mtx;
+    std::condition_variable cv;
+    size_t remaining{0};
+    std::vector<WorkerExecutionRecord> records;
+  };
+
+  auto sync = std::make_shared<SyncBatch>();
+  sync->remaining = tasks.size();
+
+  {
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    for (const auto& [name, fn] : tasks) {
+      task_queue_.push([sync, name, fn]() {
+        auto start = std::chrono::steady_clock::now();
+        WorkerExecutionRecord rec;
+        rec.task_name = name;
+        rec.thread_id = std::this_thread::get_id();
+        try {
+          fn();
+          rec.success = true;
+        } catch (const std::exception& e) {
+          rec.success = false;
+          rec.error_message = e.what();
+        } catch (...) {
+          rec.success = false;
+          rec.error_message = "Unknown exception in parallel task execution";
+        }
+        auto finish = std::chrono::steady_clock::now();
+        rec.duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count();
+
+        {
+          std::lock_guard<std::mutex> sync_lock(sync->mtx);
+          sync->records.push_back(rec);
+          sync->remaining--;
+          if (sync->remaining == 0) {
+            sync->cv.notify_one();
+          }
+        }
+      });
+    }
+  }
+
+  // Wake up worker threads
+  cv_.notify_all();
+
+  // Wait for all parallel tasks to finish
+  {
+    std::unique_lock<std::mutex> sync_lock(sync->mtx);
+    sync->cv.wait(sync_lock, [&sync]() {
+      return sync->remaining == 0;
+    });
+  }
+
+  {
+    std::lock_guard<std::mutex> rec_lock(records_mutex_);
+    last_records_ = sync->records;
+  }
+
+  return sync->records;
+}
+
+std::vector<WorkerExecutionRecord> CoroutineScheduler::GetLastExecutionRecords() const {
+  std::lock_guard<std::mutex> rec_lock(records_mutex_);
+  return last_records_;
+}
+
 // ============================================================================
 // CoroutineHostObject Implementation
 // ============================================================================
@@ -139,7 +213,7 @@ void CoroutineHostObject::SetProperty(const std::string& /*name*/, const JsiValu
 }
 
 std::vector<std::string> CoroutineHostObject::GetPropertyNames() const {
-  return {"workerCount", "step", "runAll"};
+  return {"workerCount", "step", "runAll", "dispatchParallel"};
 }
 
 JsiValueVariant CoroutineHostObject::InvokeMethod(const std::string& name, const std::vector<JsiValueVariant>& args) {
