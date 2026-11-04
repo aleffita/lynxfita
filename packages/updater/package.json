@@ -1,0 +1,16 @@
+{
+  "name": "@lynxfita/updater",
+  "version": "0.1.0",
+  "description": "LynxFita Updater: GitHub Releases integration, deterministic signature verification & mTLS RBAC certificate exchange ledger",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test tests/*.test.mjs",
+    "lint": "echo updater:lint-ok"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

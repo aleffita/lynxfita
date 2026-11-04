@@ -1,0 +1,16 @@
+{
+  "name": "@lynxfita/cli",
+  "version": "0.1.0",
+  "description": "LynxFita CLI: Developer tooling to scaffold, build, and verify Static Hermes and CORDIS native modules",
+  "bin": {
+    "lynxfita": "./bin/lynxfita.js"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "lint": "echo cli:lint-ok"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

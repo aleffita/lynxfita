@@ -172,6 +172,18 @@ importers:
 
   examples/desktop-hermes-app: {}
 
+  packages/builder:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+
+  packages/cli:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+
   packages/codegen:
     devDependencies:
       typescript:
@@ -179,6 +191,12 @@ importers:
         version: 5.9.3
 
   packages/core:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+
+  packages/updater:
     devDependencies:
       typescript:
         specifier: ^5.8.2

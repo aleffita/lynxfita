@@ -2,6 +2,10 @@
 #include "lynxfita/legacy_bridge_interceptor.h"
 #include "lynxfita/wasi_host_module.h"
 #include "lynxfita/generated/native_sensor_spec.h"
+#include "lynxfita/dma_eib_engine.h"
+#include "lynxfita/coroutine_scheduler.h"
+#include "lynxfita/protobuf_bridge.h"
+#include "lynxfita/hermes_compiler.h"
 
 #include <iostream>
 #include <cassert>
@@ -259,6 +263,192 @@ void TestThreadSafety() {
   std::cout << "  [PASS] TestThreadSafety succeeded with " << interceptor->GetDirectJsiDispatches() << " dispatches under concurrent mutation." << std::endl;
 }
 
+void TestDmaEibEngine() {
+  std::cout << "[RUN] TestDmaEibEngine (Stationary Memory, SIMD Vector Packing, and DMA Lanes)..." << std::endl;
+  auto engine = std::make_shared<DmaEibEngine>(1024 * 1024); // 1 MB arena
+  assert(engine->GetStationaryBuffer().Capacity() == 1024 * 1024);
+
+  // 1. Pack SIMD 4-float vector into stationary buffer
+  assert(engine->GetStationaryBuffer().PackSimdVector4f(0, 1.5f, 2.5f, 3.5f, 4.5f));
+  float x = 0, y = 0, z = 0, w = 0;
+  assert(engine->GetStationaryBuffer().UnpackSimdVector4f(0, x, y, z, w));
+  assert(x == 1.5f && y == 2.5f && z == 3.5f && w == 4.5f);
+
+  // 2. Setup bidirectional DMA channel
+  assert(engine->CreateChannel(1, DmaLaneDirection::Bidirectional));
+  assert(!engine->CreateChannel(1, DmaLaneDirection::Bidirectional)); // Duplicate rejected
+  auto ch = engine->GetChannel(1);
+  assert(ch != nullptr);
+  assert(ch->GetId() == 1);
+
+  // 3. Execute zero-copy DMA transfer from offset 0 to offset 256
+  DmaTransferRequest req;
+  req.channel_id = 1;
+  req.source_offset = 0;
+  req.destination_offset = 256;
+  req.byte_count = 16; // 4 floats
+  req.is_simd_vector_aligned = true;
+
+  auto res = engine->ExecuteTransfer(req);
+  assert(res.success);
+  assert(res.bytes_transferred == 16);
+  assert(engine->GetTotalTransfers() == 1);
+  assert(engine->GetTotalBytesTransferred() == 16);
+
+  // Verify memory arrived at destination offset 256
+  float dx = 0, dy = 0, dz = 0, dw = 0;
+  assert(engine->GetStationaryBuffer().UnpackSimdVector4f(256, dx, dy, dz, dw));
+  assert(dx == 1.5f && dy == 2.5f && dz == 3.5f && dw == 4.5f);
+
+  // 4. Boundary overflow enforcement
+  DmaTransferRequest overflow_req;
+  overflow_req.channel_id = 1;
+  overflow_req.source_offset = 0;
+  overflow_req.destination_offset = (1024 * 1024) - 8;
+  overflow_req.byte_count = 16; // Exceeds capacity
+  auto err_res = engine->ExecuteTransfer(overflow_req);
+  assert(!err_res.success);
+  assert(err_res.error_message.find("overflow") != std::string::npos);
+
+  // 5. Test StationaryDmaHostObject JSI wrapper
+  auto host_obj = std::make_shared<StationaryDmaHostObject>(engine);
+  assert(std::holds_alternative<int64_t>(host_obj->GetProperty("capacity")));
+  assert(std::get<int64_t>(host_obj->GetProperty("capacity")) == 1024 * 1024);
+
+  std::vector<JsiValueVariant> jsi_transfer_args = {
+    static_cast<int64_t>(1),
+    static_cast<int64_t>(256),
+    static_cast<int64_t>(512),
+    static_cast<int64_t>(16)
+  };
+  auto jsi_res = host_obj->InvokeMethod("transfer", jsi_transfer_args);
+  assert(std::holds_alternative<std::string>(jsi_res));
+  assert(std::get<std::string>(jsi_res).find("DMA transfer complete") != std::string::npos);
+
+  std::cout << "  [PASS] TestDmaEibEngine succeeded." << std::endl;
+}
+
+void TestCoroutineScheduler() {
+  std::cout << "[RUN] TestCoroutineScheduler (Non-Colored Fiber Coroutines without GIL)..." << std::endl;
+  auto scheduler = std::make_shared<CoroutineScheduler>(2);
+  assert(scheduler->GetActiveWorkerCount() == 2);
+
+  // Register 3-step generator coroutine
+  auto coro = std::make_shared<FiberCoroutine>("tensor_stream", 3, [](size_t step) -> CoroutineYieldResult {
+    if (step == 0) return { CoroutineState::Suspended, std::string("chunk_alpha"), false, "" };
+    if (step == 1) return { CoroutineState::Suspended, std::string("chunk_beta"), false, "" };
+    return { CoroutineState::Completed, std::string("chunk_omega"), true, "" };
+  });
+
+  scheduler->RegisterCoroutine(coro);
+  assert(scheduler->GetCoroutine("tensor_stream") != nullptr);
+
+  // Step 1
+  auto s1 = scheduler->StepCoroutine("tensor_stream");
+  assert(s1.state == CoroutineState::Suspended);
+  assert(std::get<std::string>(s1.value) == "chunk_alpha");
+  assert(!s1.is_done);
+
+  // Step 2
+  auto s2 = scheduler->StepCoroutine("tensor_stream");
+  assert(s2.state == CoroutineState::Suspended);
+  assert(std::get<std::string>(s2.value) == "chunk_beta");
+
+  // Step 3 (completion)
+  auto s3 = scheduler->StepCoroutine("tensor_stream");
+  assert(s3.state == CoroutineState::Completed);
+  assert(std::get<std::string>(s3.value) == "chunk_omega");
+  assert(s3.is_done);
+
+  // Reset and run all to completion
+  coro->Reset();
+  auto all_steps = scheduler->RunToCompletion("tensor_stream");
+  assert(all_steps.size() == 3);
+
+  // JSI HostObject binding test
+  auto host_obj = std::make_shared<CoroutineHostObject>(scheduler);
+  coro->Reset();
+  auto jsi_step = host_obj->InvokeMethod("step", { std::string("tensor_stream") });
+  assert(std::holds_alternative<std::string>(jsi_step));
+  assert(std::get<std::string>(jsi_step) == "chunk_alpha");
+
+  std::cout << "  [PASS] TestCoroutineScheduler succeeded." << std::endl;
+}
+
+void TestProtobufBridge() {
+  std::cout << "[RUN] TestProtobufBridge (Binary Wire Encoding & Legacy Interception)..." << std::endl;
+
+  // 1. Varint roundtrip
+  std::vector<uint8_t> varint_buf;
+  ProtobufBridge::EncodeVarint(300, varint_buf);
+  assert(varint_buf.size() == 2);
+  const uint8_t* ptr = varint_buf.data();
+  uint64_t decoded_val = 0;
+  assert(ProtobufBridge::DecodeVarint(ptr, varint_buf.data() + varint_buf.size(), decoded_val));
+  assert(decoded_val == 300);
+
+  // 2. Method call serialization roundtrip
+  auto encoded = ProtobufBridge::EncodeMethodCall("crypto", "signHash", "hash_payload_0x1234");
+  assert(!encoded.empty());
+
+  std::string mod, meth, payload;
+  assert(ProtobufBridge::DecodeMethodCall(encoded.data(), encoded.size(), mod, meth, payload));
+  assert(mod == "crypto");
+  assert(meth == "signHash");
+  assert(payload == "hash_payload_0x1234");
+
+  // 3. Dispatch through LegacyBridgeInterceptor using binary Protobuf
+  auto interceptor = std::make_shared<LegacyBridgeInterceptor>();
+  interceptor->RegisterNativeMethod("crypto", "signHash", [](const std::vector<JsiValueVariant>& params) -> JsiValueVariant {
+    if (!params.empty() && std::holds_alternative<std::string>(params[0])) {
+      return "signed_" + std::get<std::string>(params[0]);
+    }
+    return std::string("signed_empty");
+  });
+
+  auto proto_res = interceptor->DispatchProtobuf(encoded.data(), encoded.size());
+  assert(proto_res.IsSuccess());
+  assert(proto_res.result_payload == "signed_hash_payload_0x1234");
+  assert(interceptor->GetProtobufDispatches() == 1);
+  assert(interceptor->GetBypassRatio() == 1.0);
+
+  std::cout << "  [PASS] TestProtobufBridge succeeded." << std::endl;
+}
+
+void TestHermesCompiler() {
+  std::cout << "[RUN] TestHermesCompiler (Runtime AOT Bytecode Compilation & Hot Reload)..." << std::endl;
+  auto compiler = std::make_shared<HermesRuntimeCompiler>();
+
+  // 1. Compile JavaScript source to Hermes Bytecode (.hbc)
+  CompilationOptions opts;
+  opts.optimize_aot = true;
+  opts.static_h_mode = true;
+  opts.bytecode_version = 96;
+
+  auto res = compiler->CompileSource("const answer = 42; export default answer;", "bundle://app.js", opts);
+  assert(res.success);
+  assert(!res.bytecode.empty());
+  assert(res.bytecode.size() >= 8);
+
+  // 2. Validate magic bytes: 0x1F, 'H', 'B', 'C'
+  assert(HermesRuntimeCompiler::ValidateBytecode(res.bytecode.data(), res.bytecode.size()));
+
+  // 3. Hot reload bundle
+  assert(compiler->HotReloadBundle("main_bundle", res.bytecode.data(), res.bytecode.size()));
+  assert(compiler->GetLoadedBundleCount() == 1);
+
+  // 4. JSI HostObject wrapper test
+  auto host_obj = std::make_shared<HermesCompilerHostObject>(compiler);
+  assert(std::holds_alternative<int64_t>(host_obj->GetProperty("loadedBundleCount")));
+  assert(std::get<int64_t>(host_obj->GetProperty("loadedBundleCount")) == 1);
+
+  auto compile_res = host_obj->InvokeMethod("compile", { std::string("let count = 0; count++;") });
+  assert(std::holds_alternative<std::string>(compile_res));
+  assert(std::get<std::string>(compile_res).find("Compiled HBC") != std::string::npos);
+
+  std::cout << "  [PASS] TestHermesCompiler succeeded." << std::endl;
+}
+
 int main() {
   std::cout << "=========================================================" << std::endl;
   std::cout << "   LynxFita Native C++ JSI & Architecture Test Suite     " << std::endl;
@@ -270,9 +460,14 @@ int main() {
   TestWasiHostModule();
   TestBridgePerformanceBenchmark();
   TestThreadSafety();
+  TestDmaEibEngine();
+  TestCoroutineScheduler();
+  TestProtobufBridge();
+  TestHermesCompiler();
 
   std::cout << "=========================================================" << std::endl;
   std::cout << "   ALL NATIVE TESTS PASSED SUCCESSFULLY!                 " << std::endl;
   std::cout << "=========================================================" << std::endl;
   return 0;
 }
+

@@ -14,7 +14,10 @@ const EXPECTED_SUBMODULES = [
   { name: 'lynx-website', path: 'vendor/lynx-website', branch: 'main' },
   { name: 'lynx-stack', path: 'vendor/lynx-stack', branch: 'main' },
   { name: 'hermes', path: 'vendor/hermes', branch: 'static_h' },
-  { name: 'lynx', path: 'vendor/lynx', branch: 'main' }
+  { name: 'lynx', path: 'vendor/lynx', branch: 'main' },
+  { name: 'cordis', path: 'vendor/cordis', branch: 'main' },
+  { name: 'cordis-paper', path: 'vendor/cordis-paper', branch: 'main' },
+  { name: 'kernels', path: 'vendor/kernels', branch: 'main' }
 ];
 
 function run(cmd, cwd = ROOT_DIR) {
