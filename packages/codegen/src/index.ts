@@ -90,6 +90,34 @@ export function parseTypeScriptSpec(sourceCode: string): ModuleSpec {
         returnType: normalizeReturnType(returnTypeStr),
         isAsync
       });
+    } else if (ts.isPropertySignature(member) && member.name && member.type && ts.isFunctionTypeNode(member.type)) {
+      const methodName = member.name.getText(sourceFile);
+      const fnType = member.type as ts.FunctionTypeNode;
+      const parameters: ParameterSpec[] = [];
+
+      for (const param of fnType.parameters) {
+        const paramName = param.name.getText(sourceFile);
+        const typeText = param.type ? param.type.getText(sourceFile).trim() : 'any';
+        parameters.push({
+          name: paramName,
+          type: normalizeType(typeText)
+        });
+      }
+
+      let returnTypeStr = fnType.type ? fnType.type.getText(sourceFile).trim() : 'void';
+      let isAsync = false;
+
+      if (returnTypeStr.startsWith('Promise<') && returnTypeStr.endsWith('>')) {
+        isAsync = true;
+        returnTypeStr = returnTypeStr.substring(8, returnTypeStr.length - 1).trim();
+      }
+
+      methods.push({
+        name: methodName,
+        parameters,
+        returnType: normalizeReturnType(returnTypeStr),
+        isAsync
+      });
     }
   }
 

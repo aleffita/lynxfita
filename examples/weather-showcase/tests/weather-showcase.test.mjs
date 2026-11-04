@@ -198,3 +198,27 @@ test('View Layer - Component Tree and ANSI formatting', () => {
   assert.match(ansi, /Telemetria DMA \[0x2000\]/);
   assert.match(ansi, /Previsão Horária/);
 });
+
+test('WeatherApiService - Live and deterministic offline fallback execution', async () => {
+  const service = new WeatherApiService();
+  const fallback = await service.fetchWeather(-23.5505, -46.6333, 'São Paulo', 'BR');
+
+  assert.equal(fallback.isOfflineFallback, true);
+  assert.equal(fallback.location.city, 'São Paulo');
+  assert.equal(fallback.location.country, 'BR');
+  assert.ok(fallback.current.temperature >= 15 && fallback.current.temperature <= 35);
+  assert.ok(fallback.current.humidity >= 30 && fallback.current.humidity <= 95);
+  assert.ok(fallback.hourly['3h']);
+  assert.ok(fallback.hourly['6h']);
+  assert.ok(fallback.hourly['12h']);
+
+  // Direct deterministic offline calculation check
+  const direct = service.deterministicOfflineFallback(-22.9068, -43.1729, 'Rio de Janeiro', 'BR');
+  assert.equal(direct.location.city, 'Rio de Janeiro');
+  assert.equal(direct.isOfflineFallback, true);
+
+  // Repeatability check (deterministic)
+  const direct2 = service.deterministicOfflineFallback(-22.9068, -43.1729, 'Rio de Janeiro', 'BR');
+  assert.equal(direct.current.temperature, direct2.current.temperature);
+  assert.equal(direct.current.humidity, direct2.current.humidity);
+});

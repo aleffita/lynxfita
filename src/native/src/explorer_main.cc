@@ -80,7 +80,7 @@ int RunBytecodeFile(const std::string& filePath) {
 int RunIntegratedShowcaseDemo() {
   PrintBanner();
 
-  std::cout << "\n[1/6] Initializing Static Hermes Runtime Adapter..." << std::endl;
+  std::cout << "\n[1/8] Initializing Static Hermes Runtime Adapter..." << std::endl;
   auto runtime = std::make_shared<HermesRuntimeAdapter>();
   if (!runtime->Initialize(false)) {
     std::cerr << "Failed to initialize runtime." << std::endl;
@@ -88,14 +88,14 @@ int RunIntegratedShowcaseDemo() {
   }
   std::cout << "  -> Runtime Type: " << (runtime->GetRuntimeType() == RuntimeType::HermesAOT ? "Hermes AOT" : "Generic JSI") << std::endl;
 
-  std::cout << "\n[2/6] Initializing Stationary DMA Arena (1 MB, 64-byte aligned)..." << std::endl;
+  std::cout << "\n[2/8] Initializing Stationary DMA Arena (1 MB, 64-byte aligned)..." << std::endl;
   auto dma = std::make_shared<DmaEibEngine>(1024 * 1024);
   assert(dma->GetStationaryBuffer().IsCacheLineAligned());
   std::cout << "  -> Stationary Memory: " << (dma->GetStationaryBuffer().Capacity() / 1024) << " KB allocated" << std::endl;
   std::cout << "  -> Cache-line aligned (64B): YES" << std::endl;
 
   // Pack Weather Telemetry into DMA Offset 0x2000: [temp, humidity, pressure, windSpeed]
-  std::cout << "\n[3/6] Synchronizing Weather Showcase SIMD Telemetry into DMA offset 0x2000..." << std::endl;
+  std::cout << "\n[3/8] Synchronizing Weather Showcase SIMD Telemetry into DMA offset 0x2000..." << std::endl;
   dma->GetStationaryBuffer().PackSimdVector4f(0x2000, 24.5f, 65.0f, 1013.25f, 12.0f);
   float temp = 0, humidity = 0, pressure = 0, windSpeed = 0;
   dma->GetStationaryBuffer().UnpackSimdVector4f(0x2000, temp, humidity, pressure, windSpeed);
@@ -103,7 +103,7 @@ int RunIntegratedShowcaseDemo() {
             << "%, Pressure=" << pressure << "hPa, Wind=" << windSpeed << "km/h" << std::endl;
 
   // Execute SIMD Vector Fused Multiply-Add (FMA) compute kernel
-  std::cout << "\n[4/6] Executing C++20 SIMD Vector FMA Compute Kernel (SSE/AVX)..." << std::endl;
+  std::cout << "\n[4/8] Executing C++20 SIMD Vector FMA Compute Kernel (SSE/AVX)..." << std::endl;
   dma->GetStationaryBuffer().PackSimdVector4f(64, 1.0f, 2.0f, 3.0f, 4.0f);
   dma->GetStationaryBuffer().PackSimdVector4f(128, 10.0f, 20.0f, 30.0f, 40.0f);
   dma->GetStationaryBuffer().SimdVectorFmaAdd(64, 128, 192, 4, 0.5f);
@@ -111,8 +111,32 @@ int RunIntegratedShowcaseDemo() {
   dma->GetStationaryBuffer().UnpackSimdVector4f(192, r0, r1, r2, r3);
   std::cout << "  -> FMA Result [64 + 128 * 0.5]: [" << r0 << ", " << r1 << ", " << r2 << ", " << r3 << "]" << std::endl;
 
+  // Initialize Sandboxed WASI Host Module
+  std::cout << "\n[5/8] Initializing Sandboxed WASI Host Module (Linear Memory Isolation)..." << std::endl;
+  WasiCapabilities caps;
+  caps.memory_limit_bytes = 16 * 1024 * 1024; // 16 MB sandbox limit
+  WasiHostModule wasiModule("weather_atmospheric_wasi", caps);
+  const uint8_t wasmHeader[4] = {0x00, 0x61, 0x73, 0x6D}; // \0asm
+  wasiModule.WriteMemory(0, wasmHeader, 4);
+  std::vector<uint8_t> readBack;
+  wasiModule.ReadMemory(0, 4, readBack);
+  bool wasiVerified = (readBack.size() == 4 && readBack[0] == 0x00 && readBack[1] == 0x61 && readBack[2] == 0x73 && readBack[3] == 0x6D);
+  std::cout << "  -> WASI Sandbox: Memory=" << (caps.memory_limit_bytes / (1024 * 1024)) << "MB limit, Linear Isolation verified: "
+            << (wasiVerified ? "YES" : "NO") << std::endl;
+
+  // Initialize Hermes Runtime Compiler
+  std::cout << "\n[6/8] Initializing Hermes Runtime AOT Compiler & Bytecode Validator..." << std::endl;
+  HermesRuntimeCompiler compiler;
+  auto compileResult = compiler.CompileSource(
+    "const computeAdvection = (temp, wind) => temp * 0.05 + wind * 0.2;",
+    "lynxfita://weather/advection.js"
+  );
+  bool bcValid = compileResult.success && HermesRuntimeCompiler::ValidateBytecode(compileResult.bytecode.data(), compileResult.bytecode.size());
+  std::cout << "  -> Hermes AOT Compiler: Compiled worklet (" << compileResult.bytecode.size() << " bytes), Bytecode Magic 0x1F484243: "
+            << (bcValid ? "VERIFIED" : "FAILED") << std::endl;
+
   // Intercept Bridge using Protobuf binary wire encoding
-  std::cout << "\n[5/6] Intercepting Legacy Bridge with Protobuf Binary Wire Encoding..." << std::endl;
+  std::cout << "\n[7/8] Intercepting Legacy Bridge with Protobuf Binary Wire Encoding..." << std::endl;
   auto interceptor = std::make_shared<LegacyBridgeInterceptor>();
   interceptor->RegisterNativeMethod("weather", "getTelemetry", [](const std::vector<JsiValueVariant>&) -> JsiValueVariant {
     return std::string("{\"city\":\"Sao Paulo\",\"temp\":24.5,\"condition\":\"Partly Cloudy\"}");
@@ -123,7 +147,7 @@ int RunIntegratedShowcaseDemo() {
   std::cout << "  -> JSON Bypass Ratio: " << std::fixed << std::setprecision(2) << (interceptor->GetBypassRatio() * 100.0) << "%" << std::endl;
 
   // Coroutine scheduler background workers
-  std::cout << "\n[6/6] Dispatching Parallel Fiber Coroutines without GIL on 4 Native Workers..." << std::endl;
+  std::cout << "\n[8/8] Dispatching Parallel Fiber Coroutines without GIL on 4 Native Workers..." << std::endl;
   auto scheduler = std::make_shared<CoroutineScheduler>(4);
   std::vector<std::pair<std::string, std::function<void()>>> tasks = {
     {"atmospheric_shader_step", []() { std::this_thread::sleep_for(std::chrono::milliseconds(2)); }},
@@ -151,9 +175,21 @@ int main(int argc, char* argv[]) {
       std::cout << "lynxfita_explorer v2.0.0 (C++20 MSVC/GCC/Clang Native Engine)" << std::endl;
       return 0;
     }
-    if (arg1 == "--run" && argc > 2) {
-      return RunBytecodeFile(argv[2]);
+    if (arg1 == "--run") {
+      if (argc > 2) {
+        return RunBytecodeFile(argv[2]);
+      } else {
+        std::cerr << "[ERROR] --run requires a path to a bytecode bundle file (.hbc)." << std::endl;
+        PrintHelp();
+        return 1;
+      }
     }
+    if (arg1 == "--demo") {
+      return RunIntegratedShowcaseDemo();
+    }
+    std::cerr << "[ERROR] Unknown option: " << arg1 << std::endl;
+    PrintHelp();
+    return 1;
   }
 
   return RunIntegratedShowcaseDemo();

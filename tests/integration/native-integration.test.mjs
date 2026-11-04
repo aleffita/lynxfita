@@ -31,6 +31,30 @@ test('Integration - Native Standalone C++20 Executables', () => {
     assert.match(demoOutput, /ALL SUBSYSTEMS VERIFIED & OPERATIONAL/);
     assert.match(demoOutput, /Synchronizing Weather Showcase SIMD Telemetry into DMA offset 0x2000/);
     assert.match(demoOutput, /Executing C\+\+20 SIMD Vector FMA Compute Kernel/);
+    assert.match(demoOutput, /Initializing Sandboxed WASI Host Module/);
+    assert.match(demoOutput, /Initializing Hermes Runtime AOT Compiler/);
+
+    const helpOutput = execSync(`"${explorerBin}" --help`, { encoding: 'utf-8' });
+    assert.match(helpOutput, /Usage:/);
+    assert.match(helpOutput, /--run <file\.hbc>/);
+
+    // Test --run with an actual bytecode bundle if available
+    const bundlePath = resolve('packages/cli/dist/cli.hbc');
+    if (existsSync(bundlePath)) {
+      const runOutput = execSync(`"${explorerBin}" --run "${bundlePath}"`, { encoding: 'utf-8' });
+      assert.match(runOutput, /Loading Hermes bytecode bundle/);
+      assert.match(runOutput, /Hermes Bytecode Loaded/);
+    }
+
+    // Negative path 1: --run missing argument
+    assert.throws(() => {
+      execSync(`"${explorerBin}" --run`, { encoding: 'utf-8', stdio: 'pipe' });
+    });
+
+    // Negative path 2: unknown flag
+    assert.throws(() => {
+      execSync(`"${explorerBin}" --unknown-flag-xyz`, { encoding: 'utf-8', stdio: 'pipe' });
+    });
   }
 });
 

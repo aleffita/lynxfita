@@ -95,14 +95,14 @@ export class PluginLedger {
 
     const doActivation = async (): Promise<boolean> => {
       // 1. Verify dependencies are active
-      for (const depId of plugin.meta.dependencies) {
+      for (const depId of plugin.meta.dependencies || []) {
         if (this.pluginStates.get(depId) !== PluginState.Active) {
           throw new Error(`Cannot activate ${id}: dependency ${depId} is not active`);
         }
       }
 
       // 2. Verify spatial coeffects are satisfied
-      for (const coef of plugin.meta.requiredCoeffects) {
+      for (const coef of plugin.meta.requiredCoeffects || []) {
         if (!this.coeffects.has(coef)) {
           this.pluginStates.set(id, PluginState.Suspended);
           return false;
@@ -189,6 +189,10 @@ export class PluginLedger {
       return await this.activatePlugin(id);
     }
     return true;
+  }
+
+  public getPlugin(id: string): PluginDefinition | undefined {
+    return this.plugins.get(id);
   }
 
   public getLedgerStatus(): PluginLedgerEntry[] {

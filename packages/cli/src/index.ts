@@ -3,6 +3,7 @@ import { resolve, join, basename } from 'node:path';
 import { parseTypeScriptSpec, JsiCodeGenerator } from '@lynxfita/codegen';
 import { BundlePackager } from '@lynxfita/builder';
 import { StationaryDmaClient } from '@lynxfita/core';
+import { WasiHostContext } from '@lynxfita/wasi-runtime';
 
 export interface InitResult {
   success: boolean;
@@ -167,14 +168,39 @@ export function runCodegen(specFilePath: string, outDir = 'src/native_gen'): Cod
   };
 }
 
-export function buildProject(targetDir = process.cwd(), entryFile?: string): BuildResult {
-  const dir = resolve(targetDir);
-  const entry = entryFile ? resolve(dir, entryFile) : (
-    existsSync(join(dir, 'src', 'index.ts')) ? join(dir, 'src', 'index.ts') :
-    existsSync(join(dir, 'index.ts')) ? join(dir, 'index.ts') :
-    existsSync(join(dir, 'src', 'index.js')) ? join(dir, 'src', 'index.js') :
-    null
-  );
+export interface BuildOptions {
+  entryFile?: string;
+  outDir?: string;
+}
+
+export function buildProject(
+  targetDirOrOptions: string | BuildOptions = process.cwd(),
+  entryFile?: string,
+  outDirParam?: string
+): BuildResult {
+  let projectDir = process.cwd();
+  let entryOpt = entryFile;
+  let outOpt = outDirParam;
+
+  if (typeof targetDirOrOptions === 'object' && targetDirOrOptions !== null) {
+    entryOpt = targetDirOrOptions.entryFile;
+    outOpt = targetDirOrOptions.outDir;
+  } else if (typeof targetDirOrOptions === 'string') {
+    projectDir = resolve(targetDirOrOptions);
+  }
+
+  const dir = projectDir;
+  const entry = entryOpt
+    ? resolve(dir, entryOpt)
+    : (
+        existsSync(join(dir, 'src', 'index.ts'))
+          ? join(dir, 'src', 'index.ts')
+          : existsSync(join(dir, 'index.ts'))
+          ? join(dir, 'index.ts')
+          : existsSync(join(dir, 'src', 'index.js'))
+          ? join(dir, 'src', 'index.js')
+          : null
+      );
 
   let sourceCode = 'export const answer = 42;';
   if (entry && existsSync(entry)) {
@@ -189,7 +215,7 @@ export function buildProject(targetDir = process.cwd(), entryFile?: string): Bui
     ['default']
   );
 
-  const outDist = join(dir, 'dist');
+  const outDist = outOpt ? resolve(dir, outOpt) : join(dir, 'dist');
   if (!existsSync(outDist)) {
     mkdirSync(outDist, { recursive: true });
   }
@@ -213,6 +239,7 @@ export function buildProject(targetDir = process.cwd(), entryFile?: string): Bui
 export function runDoctor(): DoctorResult {
   const nodeMajor = parseInt(process.versions.node.split('.')[0] || '0', 10);
 
+  // 1. Stationary DMA check
   let dmaOk = false;
   try {
     const dma = new StationaryDmaClient(64 * 1024);
@@ -223,17 +250,51 @@ export function runDoctor(): DoctorResult {
     dmaOk = false;
   }
 
-  const checks = {
+  // 2. Sandboxed WASI memory integrity check
+  let wasiOk = false;
+  try {
+    const wasi = new WasiHostContext({ maxMemoryBytes: 1024 * 1024 });
+    const testData = new Uint8Array([0x00, 0x61, 0x73, 0x6d]); // \0asm magic
+    wasi.writeBytes(0, testData);
+    const readBack = wasi.readBytes(0, 4);
+    wasiOk = readBack[0] === 0x00 && readBack[1] === 0x61 && readBack[2] === 0x73 && readBack[3] === 0x6d;
+  } catch {
+    wasiOk = false;
+  }
+
+  // 3. Submodule check (vendor/hermes or submodule existence)
+  const repoRoot = resolve(process.cwd());
+  const hermesVendor = existsSync(join(repoRoot, 'vendor', 'hermes')) ||
+                       existsSync(join(repoRoot, '..', '..', 'vendor', 'hermes'));
+  const cordisVendor = existsSync(join(repoRoot, 'vendor', 'cordis')) ||
+                       existsSync(join(repoRoot, '..', '..', 'vendor', 'cordis'));
+  const submodulesOk = hermesVendor || cordisVendor || existsSync(join(repoRoot, '.gitmodules'));
+
+  // 4. Workspace packages check
+  const pkgDir = existsSync(join(repoRoot, 'packages'))
+    ? join(repoRoot, 'packages')
+    : existsSync(join(repoRoot, '..', '..', 'packages'))
+    ? join(repoRoot, '..', '..', 'packages')
+    : null;
+  const packagesOk = pkgDir !== null && existsSync(join(pkgDir, 'core'));
+
+  const checks: Record<string, boolean> = {
     nodeVersionGte20: nodeMajor >= 20,
     hasSupportedPlatform: ['win32', 'linux', 'darwin'].includes(process.platform),
     hasSupportedArch: ['x64', 'arm64'].includes(process.arch),
-    stationaryDmaIntegrity: dmaOk
+    stationaryDmaIntegrity: dmaOk,
+    wasiSandboxIntegrity: wasiOk,
+    vendorSubmodulesIntegrity: submodulesOk,
+    workspacePackagesIntegrity: packagesOk
   };
 
-  const details = {
+  const details: Record<string, string> = {
     node: process.version,
     platform: `${process.platform} (${process.arch})`,
-    dmaArena: dmaOk ? 'Stationary 64KB SIMD buffer operational' : 'Allocation failed'
+    dmaArena: dmaOk ? 'Stationary 64KB SIMD buffer operational' : 'Allocation failed',
+    wasiSandbox: wasiOk ? 'Linear memory sandbox operational' : 'WASI initialization failed',
+    submodules: submodulesOk ? 'Vendor submodules verified' : 'Vendor submodules missing',
+    packages: packagesOk ? 'Workspace packages verified' : 'Workspace packages missing'
   };
 
   const ok = Object.values(checks).every(Boolean);
@@ -324,12 +385,12 @@ export async function runCli(argv: string[]): Promise<number> {
         if (entryIdx !== -1 && args[entryIdx + 1]) {
           entryFile = args[entryIdx + 1];
         }
-        let outDir: string = process.cwd();
+        let outDir: string | undefined;
         const outIdx = args.indexOf('--out');
         if (outIdx !== -1 && args[outIdx + 1]) {
           outDir = args[outIdx + 1]!;
         }
-        const res = buildProject(outDir, entryFile);
+        const res = buildProject(process.cwd(), entryFile, outDir);
         console.log(res.output);
         if (res.manifestFile) {
           console.log(`  Manifest: ${res.manifestFile}`);
