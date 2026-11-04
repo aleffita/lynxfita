@@ -70,6 +70,9 @@ jobs:
       - name: Run Native Unit Tests
         run: build\native\lynxfita_native_tests.exe
 
+      - name: Verify Standalone lynxfita_explorer Executable
+        run: build\native\lynxfita_explorer.exe --version
+
   native-posix:
     name: Native C++20 (Linux GCC/Clang POSIX)
     runs-on: ubuntu-latest
@@ -89,3 +92,6 @@ jobs:
 
       - name: Run Native Unit Tests
         run: ./build/native/lynxfita_native_tests
+
+      - name: Verify Standalone lynxfita_explorer Executable
+        run: ./build/native/lynxfita_explorer --version

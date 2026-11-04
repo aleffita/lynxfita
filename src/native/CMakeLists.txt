@@ -45,3 +45,14 @@ target_link_libraries(lynxfita_native_tests PRIVATE
 )
 
 add_test(NAME LynxFitaNativeTests COMMAND lynxfita_native_tests)
+
+# LynxFita Explorer Standalone Executable
+add_executable(lynxfita_explorer
+    src/explorer_main.cc
+)
+
+target_link_libraries(lynxfita_explorer PRIVATE
+    lynxfita_native
+    Threads::Threads
+)
+

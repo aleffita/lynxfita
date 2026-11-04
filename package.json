@@ -1,6 +1,6 @@
 {
   "name": "lynxfita",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Next-Gen High-Performance Desktop & Embedded Runtime for LynxJS: Static Hermes, Direct JSI Engine Interop, WASI Native Modules & Zero-JSON-Bridge Architecture",
   "author": "Alef Oliveira (Alefita) <me@aleffita.dev>",
@@ -13,7 +13,10 @@
   "packageManager": "pnpm@12.5.1",
   "scripts": {
     "build": "pnpm -r run build",
-    "test": "pnpm -r run test",
+    "test": "node --test tests/e2e/*.test.mjs tests/integration/*.test.mjs && pnpm -r run test",
+    "test:unit": "pnpm -r run test",
+    "test:integration": "node --test tests/integration/*.test.mjs",
+    "test:e2e": "node --test tests/e2e/*.test.mjs",
     "test:native": "scripts\\test-native.cmd",
     "vendor:status": "node scripts/vendor-sync.mjs --status",
     "vendor:sync": "node scripts/vendor-sync.mjs --sync",

@@ -55,6 +55,7 @@ export class PluginLedger {
   private effectStacks = new Map<string, RevertibleEffect[]>();
   private coeffects: CoeffectMap = new Map();
   private activationHistory: string[] = [];
+  private inFlightActivations = new Map<string, Promise<boolean>>();
 
   constructor() {}
 
@@ -83,49 +84,67 @@ export class PluginLedger {
       throw new Error(`Plugin ${id} not found in CORDIS ledger`);
     }
 
-    // 1. Verify dependencies are active
-    for (const depId of plugin.meta.dependencies) {
-      if (this.pluginStates.get(depId) !== PluginState.Active) {
-        throw new Error(`Cannot activate ${id}: dependency ${depId} is not active`);
-      }
+    if (this.pluginStates.get(id) === PluginState.Active) {
+      return true;
     }
 
-    // 2. Verify spatial coeffects are satisfied
-    for (const coef of plugin.meta.requiredCoeffects) {
-      if (!this.coeffects.has(coef)) {
-        this.pluginStates.set(id, PluginState.Suspended);
-        return false;
-      }
+    const inFlight = this.inFlightActivations.get(id);
+    if (inFlight) {
+      return await inFlight;
     }
 
-    // 3. Create Plugin Context with revertible effect tracker
-    const effectStack = this.effectStacks.get(id) || [];
-    const ctx: PluginContext = {
-      pluginId: id,
-      coeffects: this.coeffects,
-      hasCoeffect: (name: string) => this.coeffects.has(name),
-      getCoeffect: <T>(name: string) => this.coeffects.get(name) as T | undefined,
-      registerEffect: async (name, apply, revert) => {
-        await apply();
-        effectStack.push({
-          name,
-          appliedAt: Date.now(),
-          revert
-        });
+    const doActivation = async (): Promise<boolean> => {
+      // 1. Verify dependencies are active
+      for (const depId of plugin.meta.dependencies) {
+        if (this.pluginStates.get(depId) !== PluginState.Active) {
+          throw new Error(`Cannot activate ${id}: dependency ${depId} is not active`);
+        }
+      }
+
+      // 2. Verify spatial coeffects are satisfied
+      for (const coef of plugin.meta.requiredCoeffects) {
+        if (!this.coeffects.has(coef)) {
+          this.pluginStates.set(id, PluginState.Suspended);
+          return false;
+        }
+      }
+
+      // 3. Create Plugin Context with revertible effect tracker
+      const effectStack = this.effectStacks.get(id) || [];
+      const ctx: PluginContext = {
+        pluginId: id,
+        coeffects: this.coeffects,
+        hasCoeffect: (name: string) => this.coeffects.has(name),
+        getCoeffect: <T>(name: string) => this.coeffects.get(name) as T | undefined,
+        registerEffect: async (name, apply, revert) => {
+          await apply();
+          effectStack.push({
+            name,
+            appliedAt: Date.now(),
+            revert
+          });
+        }
+      };
+
+      try {
+        await plugin.activate(ctx);
+        this.pluginStates.set(id, PluginState.Active);
+        this.activationHistory.push(id);
+        return true;
+      } catch (err) {
+        this.pluginStates.set(id, PluginState.Failed);
+        // Clean rollback of any partial effects registered before failure
+        await this.rollbackEffects(id);
+        throw err;
       }
     };
 
-    try {
-      await plugin.activate(ctx);
-      this.pluginStates.set(id, PluginState.Active);
-      this.activationHistory.push(id);
-      return true;
-    } catch (err) {
-      this.pluginStates.set(id, PluginState.Failed);
-      // Clean rollback of any partial effects registered before failure
-      await this.rollbackEffects(id);
-      throw err;
-    }
+    const activationPromise = doActivation().finally(() => {
+      this.inFlightActivations.delete(id);
+    });
+
+    this.inFlightActivations.set(id, activationPromise);
+    return await activationPromise;
   }
 
   public async deactivatePlugin(id: string): Promise<boolean> {
