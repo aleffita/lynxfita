@@ -141,16 +141,10 @@ test('E2E Full Lifecycle - Codegen, MVI, DMA, WGSL, AOT Builder, mTLS RBAC, and 
   const otaPackage = await updater.fetchOtaBundleFromGitHubPackages('lynxfita-bundle-weather-showcase', '2.0.1', rbacLedger);
   assert.equal(otaPackage.verified, true);
 
-  const weatherPluginV2 = {
-    ...weatherPluginV1,
-    meta: {
-      ...weatherPluginV1.meta,
-      version: otaPackage.version
-    }
-  };
-  assert.equal(await superAppLedger.hotReloadPlugin('weather-showcase-mvi', weatherPluginV2), true);
+  const appliedHotReload = await updater.applyOtaBundle(otaPackage, superAppLedger);
+  assert.equal(appliedHotReload, true);
   assert.equal(superAppLedger.getLedgerStatus()[0].meta.version, '2.0.1');
-  console.log('  -> OTA Hot-reload applied in-place to v2.0.1.');
+  console.log('  -> OTA Hot-reload applied in-place to v2.0.1 via updater.');
 
   // Rollback on deactivation (temporal inversion)
   assert.equal(await superAppLedger.deactivatePlugin('weather-showcase-mvi'), true);

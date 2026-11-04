@@ -215,6 +215,18 @@ jobs:
             "
             npm publish ./packages/$pkg --no-git-checks --provenance=false || echo "Package already published or warning"
           done
+          echo "Publishing @aleffita/lynxfita-bundle-weather-showcase..."
+          node -e "
+            const fs = require('fs');
+            const path = './examples/weather-showcase/package.json';
+            const p = JSON.parse(fs.readFileSync(path, 'utf8'));
+            p.name = '@aleffita/lynxfita-bundle-weather-showcase';
+            p.version = '${{ github.ref_name }}'.replace(/^v/, '');
+            p.publishConfig = { registry: 'https://npm.pkg.github.com/' };
+            delete p.private;
+            fs.writeFileSync(path, JSON.stringify(p, null, 2));
+          "
+          npm publish ./examples/weather-showcase --no-git-checks --provenance=false || echo "Package already published or warning"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

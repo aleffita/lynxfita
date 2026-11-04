@@ -86,3 +86,20 @@ test('JsiCodeGenerator generates typed TypeScript binding', () => {
   assert.ok(tsBinding.includes('public async calibrate(factor: number): Promise<boolean>'));
 });
 
+test('parseTypeScriptSpec supports function property signatures', () => {
+  const tsSource = `
+    export interface NativeSensorSpec {
+      computeReading: (sensorId: string, gain: number) => number;
+      streamData: (active: boolean) => Promise<Uint8Array>;
+    }
+  `;
+  const spec = parseTypeScriptSpec(tsSource);
+  assert.equal(spec.name, 'Sensor');
+  assert.equal(spec.methods.length, 2);
+  assert.equal(spec.methods[0].name, 'computeReading');
+  assert.equal(spec.methods[0].parameters.length, 2);
+  assert.equal(spec.methods[0].returnType, 'number');
+  assert.equal(spec.methods[1].isAsync, true);
+  assert.equal(spec.methods[1].returnType, 'buffer');
+});
+

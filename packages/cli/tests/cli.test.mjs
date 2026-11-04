@@ -94,3 +94,29 @@ test('LynxFita CLI - codegen command generates C++ header and TS binding', () =>
   }
 });
 
+test('LynxFita CLI - build command with --out custom dir', () => {
+  const customOut = resolve('test-build-out');
+  if (existsSync(customOut)) {
+    rmSync(customOut, { recursive: true, force: true });
+  }
+
+  try {
+    const output = execSync(`node "${cliPath}" build --out "${customOut}"`, { encoding: 'utf-8' });
+    assert.match(output, /Compiled Hermes AOT bundle/);
+    assert.match(output, /Build completed successfully/);
+    assert.equal(existsSync(resolve(customOut, 'bundle.manifest.json')), true);
+  } finally {
+    if (existsSync(customOut)) {
+      rmSync(customOut, { recursive: true, force: true });
+    }
+  }
+});
+
+test('LynxFita CLI - doctor command verifies WASI, submodules, and packages', () => {
+  const output = execSync(`node "${cliPath}" doctor`, { encoding: 'utf-8' });
+  assert.match(output, /wasiSandboxIntegrity/);
+  assert.match(output, /vendorSubmodulesIntegrity/);
+  assert.match(output, /workspacePackagesIntegrity/);
+  assert.match(output, /Subsystem check: OK/);
+});
+
