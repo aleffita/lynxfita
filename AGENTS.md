@@ -102,6 +102,7 @@ To protect working memory and eliminate token bloat, agentry governance is modul
   2. Dispatch targeted, read-only reconnaissance/verification tasks to subagents first to gather empirical facts.
   3. Reflect on the findings, design the exact architectural specification, branch strategy, and verification gates.
   4. Delegate scoped, atomic work packages on isolated feature branches (`feature/*`) and personally audit every diff and CI status before any merge into `develop` or `main`.
+  5. **Mandatory Adversarial Peer-Review Gate**: Every Pull Request opened by an implementation subagent MUST undergo an independent line-by-line code review by a verification subagent (`DeepInvestigator`) checking for hardcodes, simplifications, mocks, or untested paths *before* the Coordinator authorizes merging.
 
 ### L. Strict Gitflow & CI/CD Pipeline Discipline (Zero Trunk-Based Spam)
 - **Absolute Prohibition of Direct Pushes to `main`**: Agents MUST NEVER push commits directly to `main` (trunk-based commits) or trigger multiple uncoordinated CI/CD runs.
@@ -109,7 +110,15 @@ To protect working memory and eliminate token bloat, agentry governance is modul
   - `main`: Production-grade, tagged SemVer releases only (`vX.Y.Z`).
   - `develop`: Integration branch receiving reviewed Pull Requests.
   - `feature/*`, `fix/*`, `release/*`: Working branches where all local commits and local test validations occur *before* a single push.
+- **Issue-to-PR Traceability & Zero Stale Issues**: Every feature or fix MUST map to a tracked GitHub Issue (with labels and milestone), and its Pull Request body MUST include explicit GitHub closing keywords (`Closes #N` / `Resolves #N`) so merging the PR automatically resolves and links the Issue. Never leave disconnected or stale Issues open.
+- **Dead Branch Pruning & Auto-Delete on Merge**: The repository setting `delete_branch_on_merge` MUST be enforced (`true`), and merged `feature/*`, `fix/*`, and `release/*` branches MUST be deleted immediately after merge both locally (`git branch -d`) and on `origin` (`git push origin --delete` / `gh pr merge --delete-branch`). Never leave dead branches lingering in the repository.
+- **Git Worktree Orchestration**: Parallel feature streams MUST use isolated Git worktrees (`git worktree`) or branched workspaces to prevent index locks and cross-branch contamination.
+- **Changelog Maintenance**: Every release cycle MUST update [`CHANGELOG.md`](file:///j:/limiar/packages/lynxfita/CHANGELOG.md) with structured SemVer release notes.
 - **CI/CD Concurrency & Gatekeeping**: All GitHub Actions workflows MUST enforce `concurrency` cancellation (`cancel-in-progress: true`), path filtering, and strict PR status checks prior to merge.
+
+### M. Releases vs. Packages Distribution Taxonomy
+- **GitHub Releases (Multi-Platform Binaries & App Executables)**: Distributes compiled native engine binaries, C++20 headers, and standalone multi-platform application executables (Windows x64, Linux x64, macOS arm64) with cryptographic SHA-256 manifests.
+- **GitHub Packages (Modular SDK & OTA AOT Bundles)**: Distributes versioned npm workspace packages (`@aleffita/*` on `npm.pkg.github.com`) and signed Over-The-Air (OTA) AOT application bundles consumed directly by `@lynxfita/updater` without requiring binary reinstallation.
 
 ---
 
