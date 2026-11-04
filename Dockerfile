@@ -17,10 +17,12 @@ RUN apk add --no-cache git python3 make g++
 COPY package.json pnpm-workspace.yaml .npmrc tsconfig.json ./
 COPY packages ./packages
 COPY examples ./examples
+COPY scripts ./scripts
 
 # Install pnpm and build TypeScript workspaces
 RUN npm install -g pnpm@12.5.1 && \
     pnpm install --frozen-lockfile=false && \
+    pnpm --filter "@lynxfita/core" run build && \
     pnpm --filter "./packages/*" run build && \
     pnpm --filter "./examples/*" run build
 
