@@ -1,0 +1,16 @@
+{
+  "name": "@lynxfita/builder",
+  "version": "0.1.0",
+  "description": "LynxFita Builder: Ahead-of-Time Hermes bytecode packager and REPACK-inspired Module Federation compiler",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test tests/*.test.mjs",
+    "lint": "echo builder:lint-ok"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

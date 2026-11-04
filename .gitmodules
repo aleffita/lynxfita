@@ -20,3 +20,14 @@
 [submodule "vendor/lynx"]
 	path = vendor/lynx
 	url = https://github.com/lynx-family/lynx.git
+[submodule "vendor/cordis"]
+	path = vendor/cordis
+	url = https://github.com/cordiverse/cordis
+	branch = main
+[submodule "vendor/cordis-paper"]
+	path = vendor/cordis-paper
+	url = https://github.com/cordiverse/paper
+	branch = main
+[submodule "vendor/kernels"]
+	path = vendor/kernels
+	url = https://github.com/huggingface/kernels

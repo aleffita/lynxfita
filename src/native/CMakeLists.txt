@@ -15,6 +15,10 @@ add_library(lynxfita_native STATIC
     src/hermes_runtime_adapter.cc
     src/legacy_bridge_interceptor.cc
     src/wasi_host_module.cc
+    src/dma_eib_engine.cc
+    src/coroutine_scheduler.cc
+    src/protobuf_bridge.cc
+    src/hermes_compiler.cc
 )
 
 target_include_directories(lynxfita_native PUBLIC

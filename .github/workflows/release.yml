@@ -1,0 +1,75 @@
+name: LynxFita Release & Distribution
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-release-artifacts:
+    name: Build & Package Release Artifacts
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup Ninja
+        uses: ashutoshvarma/setup-ninja@v1
+        with:
+          version: 1.11.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Build TypeScript Workspaces
+        run: pnpm -r run build
+
+      - name: Run Tests
+        run: pnpm -r run test
+
+      - name: Configure CMake Native
+        run: cmake -B build/native -S src/native -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Native Release Binary
+        run: cmake --build build/native --config Release
+
+      - name: Run Native Tests
+        run: build\native\lynxfita_native_tests.exe
+
+      - name: Package Release Archives
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/release -Force
+          Copy-Item -Path build/native/lynxfita_native.lib -Destination dist/release/
+          Copy-Item -Path build/native/lynxfita_native_tests.exe -Destination dist/release/
+          Compress-Archive -Path src/native/include/* -DestinationPath dist/release/lynxfita-native-headers.zip
+          Compress-Archive -Path dist/release/* -DestinationPath dist/release/lynxfita-windows-x64-${{ github.ref_name }}.zip
+          Get-FileHash -Algorithm SHA256 dist/release/*.zip | Out-File dist/release/checksums.sha256
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/release/*.zip
+            dist/release/checksums.sha256
+          draft: false
+          prerelease: false
+          generate_release_notes: true

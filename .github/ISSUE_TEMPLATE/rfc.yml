@@ -1,0 +1,22 @@
+name: RFC & Epistemic Proposal
+description: Propose a major architectural RFC or epistemic research hypothesis
+labels: ["type:rfc", "status:triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Submit an RFC (Request for Comments) for foundational architecture changes or formal research proposals.
+  - type: textarea
+    id: abstract
+    attributes:
+      label: Abstract
+      description: Concise summary of the RFC.
+    validations:
+      required: true
+  - type: textarea
+    id: specification
+    attributes:
+      label: Detailed Specification
+      description: Formal or semi-formal design specification.
+    validations:
+      required: true

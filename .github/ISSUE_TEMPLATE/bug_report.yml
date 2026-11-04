@@ -1,0 +1,38 @@
+name: Bug Report
+description: Report a bug, crash, or regression in the LynxFita runtime
+labels: ["type:bug", "status:triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue in LynxFita! Please provide detailed environment and reproduction info.
+  - type: input
+    id: environment
+    attributes:
+      label: Operating System & Environment
+      description: OS version, compiler (MSVC/Clang/GCC), CMake version, Node/pnpm version
+      placeholder: Windows 11 24H2 / MSVC 19.42 / CMake 3.30 / pnpm 12.5.1
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Clear and concise description of what went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps or commands to trigger the defect.
+      placeholder: |
+        1. Run `pnpm test`
+        2. Execute `build/native/lynxfita_native_tests.exe`
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Crash Stacks
+      render: shell

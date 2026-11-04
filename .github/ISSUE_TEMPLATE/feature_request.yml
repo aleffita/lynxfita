@@ -1,0 +1,27 @@
+name: Feature Request
+description: Propose a new capability, JSI binding, WASI syscall, or architectural improvement
+labels: ["type:feature", "status:triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Propose a new feature or architectural expansion for LynxFita.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Motivation
+      description: Is your feature request related to a problem or architectural bottleneck?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution & Architectural Design
+      description: Detailed description of what should be added.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative approaches or tradeoffs considered.

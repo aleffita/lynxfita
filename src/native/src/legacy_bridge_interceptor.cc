@@ -1,4 +1,5 @@
 #include "lynxfita/legacy_bridge_interceptor.h"
+#include "lynxfita/protobuf_bridge.h"
 #include <stdexcept>
 #include <chrono>
 
@@ -148,12 +149,55 @@ ExecutionResult LegacyBridgeInterceptor::DispatchLegacyJson(const std::string& m
   return res;
 }
 
+ExecutionResult LegacyBridgeInterceptor::DispatchProtobuf(const uint8_t* protobuf_data, size_t length) {
+  ExecutionResult res;
+  const auto start = std::chrono::steady_clock::now();
+  protobuf_dispatches_.fetch_add(1, std::memory_order_relaxed);
+
+  std::string mod;
+  std::string method;
+  std::string payload;
+
+  if (!ProtobufBridge::DecodeMethodCall(protobuf_data, length, mod, method, payload)) {
+    res.status = StatusCode::InvalidArgument;
+    res.error_message = "Failed to decode binary Protobuf method call";
+    return res;
+  }
+
+  std::vector<JsiValueVariant> params = { payload };
+  DirectNativeHandler handler;
+  {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    auto it = registered_methods_.find(BuildKey(mod, method));
+    if (it == registered_methods_.end()) {
+      res.status = StatusCode::MethodNotFound;
+      res.error_message = "Method not found in Protobuf bridge registry: " + mod + "::" + method;
+      return res;
+    }
+    handler = it->second;
+  }
+
+  try {
+    auto ret = handler(params);
+    res.status = StatusCode::Ok;
+    res.result_payload = JsiValueToString(ret);
+  } catch (const std::exception& e) {
+    res.status = StatusCode::ExecutionError;
+    res.error_message = e.what();
+  }
+
+  const auto finish = std::chrono::steady_clock::now();
+  res.execution_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count();
+  return res;
+}
+
 double LegacyBridgeInterceptor::GetBypassRatio() const {
   uint64_t direct = direct_jsi_dispatches_.load(std::memory_order_relaxed);
+  uint64_t proto = protobuf_dispatches_.load(std::memory_order_relaxed);
   uint64_t legacy = legacy_json_dispatches_.load(std::memory_order_relaxed);
-  uint64_t total = direct + legacy;
+  uint64_t total = direct + proto + legacy;
   if (total == 0) return 0.0;
-  return static_cast<double>(direct) / static_cast<double>(total);
+  return static_cast<double>(direct + proto) / static_cast<double>(total);
 }
 
 } // namespace lynxfita

@@ -74,6 +74,26 @@ To protect working memory and eliminate token bloat, agentry governance is modul
 - Never elevate for operations achievable within user space.
 - Physical handovers (reboots, hardware reconnection, external 2FA) must be cleanly surrendered to the human principal.
 
+### F. Epistemic Feedback Decoupage & Anti-Premature Ingestion
+- When receiving feedback dumps from the principal, **NEVER** start assembling a task list prematurely while reading early sentences.
+- The principal is Twice-Exceptional (2e) with non-linear, topological thinking. Ingest the entire text verbatim into `docs/transcripts/`, synthesize dialectically, cross-reference empirical sources, and only then derive atomic execution tasks.
+
+### G. Stationary Memory & DMA Lanes (CBE EIB Paradigm)
+- Treat memory hierarchically and heterogeneously, inspired by the Cell Broadband Engine (CBE) Element Interconnect Bus (EIB).
+- Pre-allocate stationary pinned buffers and communicate across PPE (Host) and SPE (Worker) lanes via bidirectional DMA rings and SIMD vector packing, eliminating Von Neumann bus saturation and redundant JSON allocations.
+
+### H. Zero-GIL Multithreading & Non-Colored Coroutines
+- Concurrency must not force function coloring (red/blue async functions) or Global Interpreter Lock (GIL) contention.
+- Utilize native fiber coroutines with iterator/`yield` scheduling executed on native background threads with lockless ring buffers.
+
+### I. Spatiotemporal Composability & Dynamic Plugin Ledgers (CORDIS)
+- Adopt the CORDIS paradigm: temporal composability via revertible effects (state rollback on deactivation) and spatial composability via reactive coeffects (contextual activation).
+- Manage plugins and bundles via a deterministic dependency ledger with hot module reloading.
+
+### J. Public Presentation, Retention & SEO
+- Landing pages (`README.md`) must be clean, elegant, high-retention, and SEO-friendly.
+- **NEVER** dump gigantic, unstyled diagrams onto the main README. Isolate in-depth technical diagrams in dedicated `docs/architecture/` artifacts with proper styling and direct links.
+
 ---
 
 ## 3. Subagent Specialization Roster
