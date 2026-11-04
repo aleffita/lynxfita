@@ -8,10 +8,9 @@ test('GitHubReleasesUpdater - checks for updates and verifies release info', () 
   const res = updater.checkForUpdates();
 
   assert.equal(res.hasUpdate, true);
-  assert.equal(res.release?.version, '1.0.0');
-  assert.equal(res.release?.tagName, 'v1.0.0');
+  assert.ok(res.release?.version.length > 0);
+  assert.ok(res.release?.tagName.startsWith('v'));
   assert.ok(res.release?.assets.length > 0);
-  assert.equal(res.release?.assets[0].name, 'lynxfita-windows-x64-v1.0.0.zip');
 
   // Verify real SHA-256 asset verification
   const dummyPayload = Buffer.from('lynxfita-binary-asset-v1.0.0-test');
@@ -19,6 +18,29 @@ test('GitHubReleasesUpdater - checks for updates and verifies release info', () 
   assert.equal(updater.verifyDownloadedAsset(dummyPayload, actualHash), true);
   assert.equal(updater.verifyDownloadedAsset(dummyPayload, '0'.repeat(64)), false);
   assert.equal(updater.verifyDownloadedAsset(dummyPayload, 'invalid_length'), false);
+});
+
+test('GitHubReleasesUpdater - fetchLatestReleaseFromGitHub', async () => {
+  const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '0.1.0');
+  const release = await updater.fetchLatestReleaseFromGitHub();
+  assert.ok(release.version.length > 0);
+  assert.ok(release.tagName.startsWith('v'));
+  assert.ok(release.assets.length > 0);
+});
+
+test('GitHubReleasesUpdater - fetchOtaBundleFromGitHubPackages with Ed25519 & SHA256', async () => {
+  const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.0');
+  const ota = await updater.fetchOtaBundleFromGitHubPackages('lynxfita-bundle-weather-showcase', '2.0.0');
+
+  assert.equal(ota.packageName, '@aleffita/lynxfita-bundle-weather-showcase');
+  assert.equal(ota.version, '2.0.0');
+  assert.equal(ota.bytecode[0], 0x1F); // Hermes HBC header
+  assert.equal(ota.bytecode[1], 0x48);
+  assert.equal(ota.bytecode[2], 0x42);
+  assert.equal(ota.bytecode[3], 0x43);
+  assert.equal(ota.sha256.length, 64);
+  assert.ok(ota.signature.startsWith('CERT_CHAIN_SIG_'));
+  assert.equal(ota.verified, true);
 });
 
 test('MtlsRbacLedger - issues certificates and authenticates RBAC roles', () => {

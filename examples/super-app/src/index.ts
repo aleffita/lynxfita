@@ -3,6 +3,12 @@ import {
   PluginLedger,
   StationaryDmaClient
 } from '@lynxfita/core';
+import {
+  WeatherStore,
+  Intents,
+  createWeatherShowcasePlugin,
+  renderAnsiWeatherView
+} from '@lynxfita/example-weather-showcase';
 
 console.log('===============================================================');
 console.log('   LynxFita Super-App Host: Multi-Bundle Module Federation     ');
@@ -24,6 +30,7 @@ const ledger = new PluginLedger();
 // Set environment spatial coeffects
 ledger.setCoeffect('hardware.dma', true);
 ledger.setCoeffect('auth.verified', true);
+ledger.setCoeffect('ui.shader.wgsl', true);
 
 // 4. Define Mini-App Bundle 1: Sensor Dashboard Mini-App
 const sensorMiniApp = {
@@ -68,12 +75,18 @@ const tradingMiniApp = {
   }
 };
 
-// 6. Register & Activate Bundles in Ledger
+// 6. Define Mini-App Bundle 3: Weather Showcase MVI Mini-App
+const weatherStore = new WeatherStore(undefined, dma);
+const weatherMiniApp = createWeatherShowcasePlugin(weatherStore);
+
+// 7. Register & Activate Bundles in Ledger
 ledger.registerPlugin(sensorMiniApp);
 ledger.registerPlugin(tradingMiniApp);
+ledger.registerPlugin(weatherMiniApp);
 
 await ledger.activatePlugin('sensor-mini-app');
 await ledger.activatePlugin('trading-mini-app');
+await ledger.activatePlugin('weather-showcase-mvi');
 
 console.log('\nActive Bundles in Super-App:');
 const status = ledger.getLedgerStatus();
@@ -81,8 +94,32 @@ for (const entry of status) {
   console.log(`  - ${entry.meta.name} (${entry.meta.id}) [State: ${entry.state}]`);
 }
 
-// 7. Demonstrate Clean Temporal Rollback on Bundle Deactivation
-console.log('\n[CORDIS] Deactivating trading-mini-app (reverting effects in LIFO order)...');
+// 8. Execute MVI Intent transitions on Weather Showcase
+console.log('\n[Weather Showcase MVI in Super-App Host]');
+console.log(renderAnsiWeatherView(weatherStore.getState()));
+
+console.log('[MVI Transition: Switching theme and updating location in Super-App]');
+await weatherStore.dispatch(Intents.toggleTheme());
+await weatherStore.dispatch(Intents.updateCoordinates(-22.9068, -43.1729, 'Rio de Janeiro', 'BR'));
+console.log(renderAnsiWeatherView(weatherStore.getState()));
+
+// 9. Demonstrate OTA Hot-Reload of Weather Showcase Bundle (v2.0.0 -> v2.0.1)
+console.log('\n[CORDIS] Performing Over-The-Air (OTA) hot-reload of weather-showcase-mvi bundle to v2.0.1...');
+const updatedWeatherPlugin = {
+  ...weatherMiniApp,
+  meta: {
+    ...weatherMiniApp.meta,
+    version: '2.0.1'
+  }
+};
+await ledger.hotReloadPlugin('weather-showcase-mvi', updatedWeatherPlugin);
+console.log('  -> Bundle successfully hot-reloaded to v2.0.1 without restarting host process!');
+
+// 10. Demonstrate Clean Temporal Rollback on Bundle Deactivation
+console.log('\n[CORDIS] Deactivating weather-showcase-mvi (reverting effects in LIFO order)...');
+await ledger.deactivatePlugin('weather-showcase-mvi');
+
+console.log('[CORDIS] Deactivating trading-mini-app (reverting effects in LIFO order)...');
 await ledger.deactivatePlugin('trading-mini-app');
 
-console.log('Super-App demonstration completed successfully.');
+console.log('\nSuper-App demonstration completed successfully.');

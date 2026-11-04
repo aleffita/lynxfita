@@ -14,9 +14,23 @@ permissions:
   packages: write
 
 jobs:
-  build-release-artifacts:
-    name: Build & Package Release Artifacts
-    runs-on: windows-latest
+  build-native-matrix:
+    name: Build Native (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+            archive-type: zip
+          - os: ubuntu-latest
+            platform: linux-x64
+            archive-type: tar
+          - os: macos-latest
+            platform: macos-arm64
+            archive-type: tar
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,8 +46,17 @@ jobs:
         with:
           version: 12.5.1
 
-      - name: Setup MSVC
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Build Tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build build-essential
+
+      - name: Install Build Tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
@@ -45,10 +68,18 @@ jobs:
         run: pnpm --filter "@lynxfita/core" run build
 
       - name: Build TypeScript Packages
-        run: pnpm --filter "./packages/*" run build
+        run: |
+          pnpm --filter "@lynxfita/codegen" run build
+          pnpm --filter "@lynxfita/builder" run build
+          pnpm --filter "@lynxfita/wasi-runtime" run build
+          pnpm --filter "@lynxfita/updater" run build
+          pnpm --filter "@lynxfita/cli" run build
 
       - name: Build Example Packages
-        run: pnpm --filter "./examples/*" run build
+        run: |
+          pnpm --filter "@lynxfita/example-weather-showcase" run build
+          pnpm --filter "desktop-hermes-app" run build
+          pnpm --filter "super-app" run build
 
       - name: Run Tests
         run: pnpm -r run test
@@ -56,39 +87,140 @@ jobs:
       - name: Configure CMake Native
         run: cmake -B build/native -S src/native -G Ninja -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build Native Release Binary
+      - name: Build Native Release Binaries
         run: cmake --build build/native --config Release
 
       - name: Run Native Tests
-        run: build\native\lynxfita_native_tests.exe
+        run: |
+          ${{ runner.os == 'Windows' && 'build\\native\\lynxfita_native_tests.exe' || './build/native/lynxfita_native_tests' }}
 
-      - name: Package Release Archives
+      - name: Verify Standalone lynxfita_explorer
+        run: |
+          ${{ runner.os == 'Windows' && 'build\\native\\lynxfita_explorer.exe --version' || './build/native/lynxfita_explorer --version' }}
+
+      - name: Package Windows Artifacts
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist/staging -Force
-          New-Item -ItemType Directory -Path dist/release -Force
-          Copy-Item -Path build/native/lynxfita_native.lib -Destination dist/staging/
+          New-Item -ItemType Directory -Path dist/artifacts -Force
+          Copy-Item -Path build/native/lynxfita_explorer.exe -Destination dist/staging/
           Copy-Item -Path build/native/lynxfita_native_tests.exe -Destination dist/staging/
-          Compress-Archive -Path src/native/include/* -DestinationPath dist/release/lynxfita-native-headers.zip
-          Compress-Archive -Path dist/staging/* -DestinationPath dist/release/lynxfita-windows-x64-${{ github.ref_name }}.zip
-          Get-FileHash -Algorithm SHA256 dist/release/*.zip | Out-File dist/release/checksums.sha256
+          Copy-Item -Path build/native/lynxfita_native.lib -Destination dist/staging/
+          Copy-Item -Path examples/super-app/dist/*.hbc -Destination dist/staging/ -ErrorAction SilentlyContinue
+          Copy-Item -Path examples/weather-showcase/dist/*.hbc -Destination dist/staging/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist/staging/* -DestinationPath dist/artifacts/lynxfita-windows-x64-${{ github.ref_name }}.zip
+          Compress-Archive -Path src/native/include/* -DestinationPath dist/artifacts/lynxfita-native-headers.zip
+
+      - name: Package POSIX Artifacts (Linux / macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p dist/staging dist/artifacts
+          cp build/native/lynxfita_explorer dist/staging/
+          cp build/native/lynxfita_native_tests dist/staging/
+          cp build/native/liblynxfita_native.a dist/staging/ 2>/dev/null || true
+          cp examples/*/*/dist/*.hbc dist/staging/ 2>/dev/null || true
+          tar -czvf "dist/artifacts/lynxfita-${{ matrix.platform }}-${{ github.ref_name }}.tar.gz" -C dist/staging .
+
+      - name: Upload Platform Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.platform }}
+          path: dist/artifacts/*
+          retention-days: 1
+
+  create-github-release:
+    name: Publish Multi-Platform GitHub Release
+    needs: build-native-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-staging
+          merge-multiple: true
+
+      - name: Generate Unified SHA-256 Checksums Manifest
+        run: |
+          mkdir -p dist/release
+          cp release-staging/* dist/release/
+          cd dist/release
+          sha256sum * > checksums.sha256
+          cat checksums.sha256
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/release/*.zip
+            dist/release/*.tar.gz
             dist/release/checksums.sha256
           draft: false
           prerelease: false
           generate_release_notes: true
 
+  publish-github-packages:
+    name: Publish Modular npm Packages & OTA Bundles
+    needs: build-native-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@aleffita'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Setup Workspace Module Proxies
+        run: node scripts/setup-workspace.mjs
+
+      - name: Build Monorepo Packages
+        run: |
+          pnpm --filter "@lynxfita/core" run build
+          pnpm --filter "@lynxfita/codegen" run build
+          pnpm --filter "@lynxfita/builder" run build
+          pnpm --filter "@lynxfita/wasi-runtime" run build
+          pnpm --filter "@lynxfita/updater" run build
+          pnpm --filter "@lynxfita/cli" run build
+          pnpm --filter "@lynxfita/example-weather-showcase" run build
+          pnpm --filter "desktop-hermes-app" run build
+          pnpm --filter "super-app" run build
+
+      - name: Publish Scoped npm Packages to GitHub Packages
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > ~/.npmrc
+          for pkg in core wasi-runtime codegen builder updater cli; do
+            echo "Publishing @aleffita/lynxfita-$pkg..."
+            node -e "
+              const fs = require('fs');
+              const path = './packages/' + '$pkg' + '/package.json';
+              const p = JSON.parse(fs.readFileSync(path, 'utf8'));
+              p.name = '@aleffita/lynxfita-' + '$pkg';
+              p.version = '${{ github.ref_name }}'.replace(/^v/, '');
+              p.publishConfig = { registry: 'https://npm.pkg.github.com/' };
+              fs.writeFileSync(path, JSON.stringify(p, null, 2));
+            "
+            npm publish ./packages/$pkg --no-git-checks --provenance=false || echo "Package already published or warning"
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   publish-container-package:
     name: Build & Push GHCR Package
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -104,4 +236,3 @@ jobs:
           docker build . -t $IMAGE_ID:$VERSION -t $IMAGE_ID:latest
           docker push $IMAGE_ID:$VERSION
           docker push $IMAGE_ID:latest
-

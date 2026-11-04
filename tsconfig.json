@@ -10,7 +10,8 @@
       "@lynxfita/wasi-runtime": ["packages/wasi-runtime/dist/index.d.ts"],
       "@lynxfita/codegen": ["packages/codegen/dist/index.d.ts"],
       "@lynxfita/builder": ["packages/builder/dist/index.d.ts"],
-      "@lynxfita/updater": ["packages/updater/dist/index.d.ts"]
+      "@lynxfita/updater": ["packages/updater/dist/index.d.ts"],
+      "@lynxfita/example-weather-showcase": ["examples/weather-showcase/dist/index.d.ts"]
     },
     "declaration": true,
     "declarationMap": true,

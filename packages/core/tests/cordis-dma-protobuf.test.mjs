@@ -7,7 +7,11 @@ import {
   CoroutineRunner,
   ProtobufWire,
   KernelWorkletDispatcher,
-  HermesCompilerClient
+  HermesCompilerClient,
+  WebGpuComputePipeline,
+  validateWgslShader,
+  TENSOR_FMA_WGSL_SHADER,
+  WEATHER_PARTICLES_WGSL_SHADER
 } from '../dist/index.js';
 
 test('CORDIS PluginLedger - Revertible Effects & Rollback', async () => {
@@ -167,3 +171,73 @@ test('HermesCompilerClient - AOT Bytecode Compilation', () => {
   assert.equal(res.magic, '0x1F484243');
   assert.ok(res.bytecodeSize >= 8);
 });
+
+test('WebGPU WGSL Shaders - Syntactic & Structural Validation', () => {
+  const fmaValidation = validateWgslShader(TENSOR_FMA_WGSL_SHADER);
+  assert.equal(fmaValidation.valid, true);
+  assert.equal(fmaValidation.errors.length, 0);
+
+  const weatherValidation = validateWgslShader(WEATHER_PARTICLES_WGSL_SHADER);
+  assert.equal(weatherValidation.valid, true);
+  assert.equal(weatherValidation.errors.length, 0);
+
+  // Invalid shaders
+  const emptyValidation = validateWgslShader('');
+  assert.equal(emptyValidation.valid, false);
+
+  const brokenBrace = validateWgslShader('@compute @workgroup_size(64) fn main() { let x = 1;');
+  assert.equal(brokenBrace.valid, false);
+});
+
+test('WebGpuComputePipeline - FMA & Weather Particles with SIMD/DMA Fallback', async () => {
+  const pipeline = new WebGpuComputePipeline();
+
+  // 1. FMA: dst = a + b * scale
+  const a = new Float32Array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
+  const b = new Float32Array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0]);
+  const resFma = await pipeline.executeFma(a, b, 0.5);
+
+  assert.equal(resFma.elementsProcessed, 8);
+  assert.ok(resFma.durationUs >= 0);
+  assert.ok(resFma.throughputGflops >= 0);
+  assert.ok(['webgpu-hardware', 'dma-simd-native'].includes(resFma.backend));
+
+  // 1.0 + 10.0*0.5 = 6.0, 2.0 + 20.0*0.5 = 12.0, etc.
+  assert.equal(resFma.data[0], 6.0);
+  assert.equal(resFma.data[1], 12.0);
+  assert.equal(resFma.data[2], 18.0);
+  assert.equal(resFma.data[3], 24.0);
+  assert.equal(resFma.data[4], 30.0);
+  assert.equal(resFma.data[5], 36.0);
+  assert.equal(resFma.data[6], 42.0);
+  assert.equal(resFma.data[7], 48.0);
+
+  // 2. Weather Particles Advection: 8 floats per particle (pos: vec4, vel: vec4)
+  const particles = new Float32Array(16); // 2 particles
+  particles[0] = 10.0; particles[1] = 20.0; // pos.x, pos.y
+  particles[4] = 1.0;  particles[5] = 2.0;  // vel.x, vel.y
+
+  particles[8] = 30.0; particles[9] = 40.0;
+  particles[12] = 0.5; particles[13] = 1.5;
+
+  const telemetry = [28.5, 75.0, 1012.0, 15.0]; // [temp, humidity, pressure, windSpeed]
+  const resParticles = await pipeline.executeWeatherParticles(particles, telemetry, 0.1);
+
+  assert.equal(resParticles.elementsProcessed, 2);
+  assert.ok(resParticles.durationUs >= 0);
+  assert.equal(resParticles.data[2], 75.0); // humidity stored in pos.z
+  assert.equal(resParticles.data[3], 28.5); // temp stored in pos.w
+});
+
+test('KernelWorkletDispatcher - FMA & Weather Particles Worklet Integration', async () => {
+  const dispatcher = new KernelWorkletDispatcher();
+
+  const resFma = await dispatcher.executeKernel('ai.lynxfita.FMA', {
+    a: { data: new Float32Array([2, 4, 6, 8]), shape: [4] },
+    b: { data: new Float32Array([1, 2, 3, 4]), shape: [4] },
+    scale: { data: new Float32Array([3]), shape: [1] }
+  });
+  // 2 + 1*3 = 5, 4 + 2*3 = 10, 6 + 3*3 = 15, 8 + 4*3 = 20
+  assert.deepEqual(Array.from(resFma.dst.data), [5, 10, 15, 20]);
+});
+
