@@ -1,0 +1,25 @@
+From e7b4c91000000000000000000000000000000001 Mon Sep 17 00:00:00 2001
+From: Alef Oliveira <me@aleffita.dev>
+Date: Wed, 4 Nov 2026 12:00:00 -0300
+Subject: [PATCH] feat(runtime): add experimental LynxFita JSI direct dispatch interface
+
+---
+ src/lynxtron_extra.gni | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/lynxtron_extra.gni b/src/lynxtron_extra.gni
+index 8e45b40..9f12a31 100644
+--- a/src/lynxtron_extra.gni
++++ b/src/lynxtron_extra.gni
+@@ -1,5 +1,9 @@
+ declare_args() {
++  # LynxFita JSI Extension Hook
++  enable_lynxfita_jsi = true
++  lynxfita_jsi_backend = "hermes"
++
+   # A list of extra dependencies to add to the root target. This allows a
+   # checkout to add additional targets without explicitly changing any checked-
+   # in files.
+   lynxtron_lib_extra_configs = []
+-- 
+2.53.0.windows.1

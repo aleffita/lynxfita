@@ -1,0 +1,11 @@
+{
+  "name": "desktop-hermes-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Example desktop application running LynxFita with Static Hermes runtime and direct JSI native modules",
+  "type": "module",
+  "scripts": {
+    "build": "echo desktop-hermes-app:build-ok",
+    "start": "node src/index.mjs"
+  }
+}

@@ -1,0 +1,22 @@
+[submodule "vendor/lynxtron"]
+	path = vendor/lynxtron
+	url = https://github.com/lynx-family/lynxtron.git
+[submodule "vendor/primjs"]
+	path = vendor/primjs
+	url = https://github.com/lynx-family/primjs.git
+[submodule "vendor/sparkling"]
+	path = vendor/sparkling
+	url = https://github.com/tiktok/Sparkling.git
+[submodule "vendor/lynx-website"]
+	path = vendor/lynx-website
+	url = https://github.com/lynx-family/lynx-website.git
+[submodule "vendor/lynx-stack"]
+	path = vendor/lynx-stack
+	url = https://github.com/lynx-family/lynx-stack.git
+[submodule "vendor/hermes"]
+	path = vendor/hermes
+	url = https://github.com/meta/hermes.git
+	branch = static_h
+[submodule "vendor/lynx"]
+	path = vendor/lynx
+	url = https://github.com/lynx-family/lynx.git

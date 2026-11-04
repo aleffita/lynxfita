@@ -1,0 +1,37 @@
+From e7b4c92000000000000000000000000000000002 Mon Sep 17 00:00:00 2001
+From: Alef Oliveira <me@aleffita.dev>
+Date: Wed, 4 Nov 2026 12:10:00 -0300
+Subject: [PATCH] feat(sparkling-method): introduce synchronous direct JSI dispatch channel
+
+Intercepts LynxPipe.call to check for global.__lynxfita_jsi_dispatcher.
+When present, routes method calls directly into C++ JSI HostObjects,
+bypassing asynchronous NativeModules JSON message pipe.
+---
+ packages/sparkling-method/src/index.ts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/packages/sparkling-method/src/index.ts b/packages/sparkling-method/src/index.ts
+index f1a9201..b82e1c3 100644
+--- a/packages/sparkling-method/src/index.ts
++++ b/packages/sparkling-method/src/index.ts
+@@ -93,6 +93,18 @@ const LynxPipe = {
+             return;
+         }
+ 
++        // LynxFita direct JSI fast-path check
++        const lynxfitaGlobal = typeof globalThis !== 'undefined' ? (globalThis as any) : null;
++        if (lynxfitaGlobal && lynxfitaGlobal.__lynxfita_jsi_dispatcher) {
++            try {
++                const result = lynxfitaGlobal.__lynxfita_jsi_dispatcher(module, method, params);
++                callback({ code: 0, data: result, msg: 'ok (direct JSI)' });
++                return;
++            } catch (jsiErr: any) {
++                // Fallback to legacy pipe if JSI dispatch throws or is unsupported
++            }
++        }
++
+         // Check if NativeModules is available
+         if (typeof NativeModules === 'undefined') {
+             callback(createErrorResponse(-2, 'NativeModules is not available. Ensure you are running in a lynx environment.'));
+-- 
+2.53.0.windows.1

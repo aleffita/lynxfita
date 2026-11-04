@@ -1,0 +1,16 @@
+{
+  "name": "@lynxfita/core",
+  "version": "0.1.0",
+  "description": "LynxFita Core: Direct JSI runtime dispatcher, legacy bridge sequestration, and Static Hermes integration",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test tests/*.test.mjs",
+    "lint": "echo core:lint-ok"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

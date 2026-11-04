@@ -1,0 +1,27 @@
+{
+  "name": "lynxfita",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Next-Gen High-Performance Desktop & Embedded Runtime for LynxJS: Static Hermes, Direct JSI Engine Interop, WASI Native Modules & Zero-JSON-Bridge Architecture",
+  "author": "Alef Oliveira (Alefita) <me@aleffita.dev>",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/aleffita/lynxfita#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aleffita/lynxfita.git"
+  },
+  "packageManager": "pnpm@12.5.1",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "test:native": "scripts\\test-native.cmd",
+    "vendor:status": "node scripts/vendor-sync.mjs --status",
+    "vendor:sync": "node scripts/vendor-sync.mjs --sync",
+    "vendor:patch": "node scripts/vendor-patch.mjs --apply",
+    "vendor:verify": "node scripts/vendor-sync.mjs --verify",
+    "lint": "pnpm -r run lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}
