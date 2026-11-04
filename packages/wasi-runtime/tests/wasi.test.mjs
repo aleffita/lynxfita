@@ -12,6 +12,32 @@ test('WasiHostContext write and read memory within bounds', () => {
   assert.equal(readBack, testStr);
 });
 
+test('WasiHostContext writeBytes and readBytes raw binary buffers', () => {
+  const ctx = new WasiHostContext();
+  const binaryPayload = new Uint8Array([0xde, 0xad, 0xbe, 0xef, 0x42]);
+  const written = ctx.writeBytes(2048, binaryPayload);
+
+  assert.equal(written, 5);
+  const readBack = ctx.readBytes(2048, 5);
+  assert.deepEqual(readBack, binaryPayload);
+});
+
+test('WasiHostContext traps on negative offsets and invalid bounds', () => {
+  const ctx = new WasiHostContext();
+
+  assert.throws(() => {
+    ctx.writeBytes(-1, new Uint8Array([1, 2, 3]));
+  }, /invalid negative offset/);
+
+  assert.throws(() => {
+    ctx.readBytes(-5, 2);
+  }, /invalid offset/);
+
+  assert.throws(() => {
+    ctx.readString(100, 100000);
+  }, /WASI memory out-of-bounds/);
+});
+
 test('WasiHostContext traps on memory exceeding limits', () => {
   const ctx = new WasiHostContext({ maxMemoryBytes: 128 * 1024 });
 

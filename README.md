@@ -117,6 +117,7 @@ Instead of maintaining brittle, unmaintained forks on GitHub, LynxFita pins offi
 ### Vendor Commands:
 - `pnpm vendor:status`: Inspect commit hashes, tracking branches, and clean status.
 - `pnpm vendor:patch`: Apply atomic patches from `patches/` to submodules.
+- `pnpm vendor:revert`: Revert atomic patches to restore pristine vendor trees.
 - `pnpm vendor:verify`: Ensure all submodules are synchronized and clean.
 
 ---
@@ -134,7 +135,7 @@ Instead of maintaining brittle, unmaintained forks on GitHub, LynxFita pins offi
 # 1. Install dependencies
 pnpm install
 
-# 2. Build all TypeScript workspace packages
+# 2. Build all TypeScript workspace packages & example application
 pnpm build
 
 # 3. Run TypeScript package test suites
@@ -144,7 +145,7 @@ pnpm test
 pnpm test:native
 
 # 5. Launch the desktop Hermes example application
-node examples/desktop-hermes-app/src/index.mjs
+pnpm --filter desktop-hermes-app start
 ```
 
 ---

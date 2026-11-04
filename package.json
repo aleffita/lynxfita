@@ -18,6 +18,7 @@
     "vendor:status": "node scripts/vendor-sync.mjs --status",
     "vendor:sync": "node scripts/vendor-sync.mjs --sync",
     "vendor:patch": "node scripts/vendor-patch.mjs --apply",
+    "vendor:revert": "node scripts/vendor-patch.mjs --revert",
     "vendor:verify": "node scripts/vendor-sync.mjs --verify",
     "lint": "pnpm -r run lint"
   },

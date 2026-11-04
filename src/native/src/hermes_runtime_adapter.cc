@@ -120,13 +120,7 @@ ExecutionResult HermesRuntimeAdapter::CallHostMethod(const std::string& object_n
   try {
     auto val = obj->InvokeMethod(method_name, args);
     res.status = StatusCode::Ok;
-    if (std::holds_alternative<std::string>(val)) {
-      res.result_payload = std::get<std::string>(val);
-    } else if (std::holds_alternative<int64_t>(val)) {
-      res.result_payload = std::to_string(std::get<int64_t>(val));
-    } else if (std::holds_alternative<bool>(val)) {
-      res.result_payload = std::get<bool>(val) ? "true" : "false";
-    }
+    res.result_payload = JsiValueToString(val);
   } catch (const std::exception& ex) {
     res.status = StatusCode::ExecutionError;
     res.error_message = ex.what();

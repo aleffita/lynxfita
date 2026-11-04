@@ -57,6 +57,26 @@ class HostObject {
   virtual JsiValueVariant InvokeMethod(const std::string& method_name, const std::vector<JsiValueVariant>& args) = 0;
 };
 
+inline std::string JsiValueToString(const JsiValueVariant& val) {
+  if (std::holds_alternative<std::string>(val)) {
+    return std::get<std::string>(val);
+  }
+  if (std::holds_alternative<int64_t>(val)) {
+    return std::to_string(std::get<int64_t>(val));
+  }
+  if (std::holds_alternative<double>(val)) {
+    return std::to_string(std::get<double>(val));
+  }
+  if (std::holds_alternative<bool>(val)) {
+    return std::get<bool>(val) ? "true" : "false";
+  }
+  if (std::holds_alternative<std::vector<uint8_t>>(val)) {
+    const auto& bytes = std::get<std::vector<uint8_t>>(val);
+    return "[BinaryBuffer size=" + std::to_string(bytes.size()) + "]";
+  }
+  return "";
+}
+
 using HostFunction = std::function<JsiValueVariant(const std::vector<JsiValueVariant>& args)>;
 
 } // namespace lynxfita

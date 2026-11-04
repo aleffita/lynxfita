@@ -1,6 +1,7 @@
 #include "lynxfita/hermes_runtime_adapter.h"
 #include "lynxfita/legacy_bridge_interceptor.h"
 #include "lynxfita/wasi_host_module.h"
+#include "lynxfita/generated/native_sensor_spec.h"
 
 #include <iostream>
 #include <cassert>
@@ -12,6 +13,17 @@
 
 using namespace lynxfita;
 
+class MockHardwareSensor : public lynxfita::generated::NativeHardwareSensorSpec {
+ public:
+  double readTemperature(std::string sensorId) override {
+    if (sensorId == "core_temp") return 42.5;
+    return 20.0;
+  }
+  bool calibrate() override {
+    return true;
+  }
+};
+
 void TestHermesRuntimeAdapter() {
   std::cout << "[RUN] TestHermesRuntimeAdapter..." << std::endl;
   HermesRuntimeAdapter adapter;
@@ -19,7 +31,7 @@ void TestHermesRuntimeAdapter() {
   assert(adapter.GetRuntimeType() == RuntimeType::HermesAOT);
 
   // Register host function
-  bool reg_fn = adapter.RegisterHostFunction("computeSha", [](const std::vector<JsiValueVariant>& args) -> JsiValueVariant {
+  bool reg_fn = adapter.RegisterHostFunction("computeSha", [](const std::vector<JsiValueVariant>&) -> JsiValueVariant {
     return std::string("hash_computed");
   });
   assert(reg_fn);
@@ -37,6 +49,35 @@ void TestHermesRuntimeAdapter() {
 
   adapter.Teardown();
   std::cout << "  [PASS] TestHermesRuntimeAdapter succeeded." << std::endl;
+}
+
+void TestCodegenNativeModule() {
+  std::cout << "[RUN] TestCodegenNativeModule (generated C++ spec)..." << std::endl;
+  HermesRuntimeAdapter adapter;
+  assert(adapter.Initialize(false));
+
+  auto sensor = std::make_shared<MockHardwareSensor>();
+  assert(sensor->GetName() == "HardwareSensor");
+  assert(adapter.RegisterHostObject("HardwareSensor", sensor));
+
+  // 1. Invoke typed readTemperature with string argument -> returns double
+  auto temp_res = adapter.CallHostMethod("HardwareSensor", "readTemperature", { std::string("core_temp") });
+  assert(temp_res.IsSuccess());
+  assert(!temp_res.result_payload.empty());
+  assert(temp_res.result_payload.find("42.5") != std::string::npos);
+
+  // 2. Invoke calibrate -> returns bool
+  auto cal_res = adapter.CallHostMethod("HardwareSensor", "calibrate", {});
+  assert(cal_res.IsSuccess());
+  assert(cal_res.result_payload == "true");
+
+  // 3. Invoke readTemperature with invalid/missing arguments -> throws argument error
+  auto err_res = adapter.CallHostMethod("HardwareSensor", "readTemperature", {});
+  assert(!err_res.IsSuccess());
+  assert(err_res.error_message.find("expected string") != std::string::npos);
+
+  adapter.Teardown();
+  std::cout << "  [PASS] TestCodegenNativeModule succeeded." << std::endl;
 }
 
 void TestLegacyBridgeInterceptor() {
@@ -85,7 +126,7 @@ void TestWasiHostModule() {
   std::cout << "[RUN] TestWasiHostModule..." << std::endl;
   WasiCapabilities caps;
   caps.allow_filesystem = false;
-  caps.memory_limit_bytes = 16 * 1024 * 1024;
+  caps.memory_limit_bytes = 1024 * 1024; // 1 MB limit
 
   auto wasi = std::make_shared<WasiHostModule>("crypto_subsystem", caps);
   assert(wasi->GetName() == "crypto_subsystem");
@@ -97,14 +138,34 @@ void TestWasiHostModule() {
   const uint8_t invalid_wasm[] = {0x01, 0x02, 0x03, 0x04};
   assert(!wasi->LoadWasmBinary(invalid_wasm, sizeof(invalid_wasm)));
 
-  // Register WASI export
-  wasi->RegisterExport("sign_payload", [](const std::vector<JsiValueVariant>& args) -> JsiValueVariant {
+  // Test linear memory read and write
+  const uint8_t test_data[] = {0xAA, 0xBB, 0xCC, 0xDD};
+  assert(wasi->WriteMemory(128, test_data, sizeof(test_data)));
+
+  std::vector<uint8_t> read_data;
+  assert(wasi->ReadMemory(128, sizeof(test_data), read_data));
+  assert(read_data.size() == 4);
+  assert(read_data[0] == 0xAA && read_data[3] == 0xDD);
+
+  // Test memory limit boundary enforcement
+  const uint8_t dummy[10] = {0};
+  assert(!wasi->WriteMemory(caps.memory_limit_bytes + 1, dummy, sizeof(dummy)));
+
+  // Register WASI export returning double / string
+  wasi->RegisterExport("sign_payload", [](const std::vector<JsiValueVariant>&) -> JsiValueVariant {
     return std::string("sig_0xdeadbeef");
+  });
+  wasi->RegisterExport("get_entropy", [](const std::vector<JsiValueVariant>&) -> JsiValueVariant {
+    return 0.9998;
   });
 
   auto exec_res = wasi->Execute("sign_payload", {});
   assert(exec_res.IsSuccess());
   assert(exec_res.result_payload == "sig_0xdeadbeef");
+
+  auto entropy_res = wasi->Execute("get_entropy", {});
+  assert(entropy_res.IsSuccess());
+  assert(entropy_res.result_payload.find("0.9998") != std::string::npos);
 
   // Test missing export
   auto missing_res = wasi->Execute("unknown_fn", {});
@@ -154,31 +215,48 @@ void TestBridgePerformanceBenchmark() {
 }
 
 void TestThreadSafety() {
-  std::cout << "[RUN] TestThreadSafety (concurrency dispatch)..." << std::endl;
+  std::cout << "[RUN] TestThreadSafety (concurrent reads, writes, and dispatches)..." << std::endl;
   auto interceptor = std::make_shared<LegacyBridgeInterceptor>();
 
   interceptor->RegisterNativeMethod("concurrent", "ping", [](const std::vector<JsiValueVariant>&) -> JsiValueVariant {
     return std::string("pong");
   });
 
-  const int threads_count = 8;
-  const int calls_per_thread = 2000;
+  const int reader_threads = 6;
+  const int writer_threads = 2;
+  const int calls_per_reader = 2000;
+  const int registrations_per_writer = 50;
   std::vector<std::thread> workers;
 
-  for (int t = 0; t < threads_count; ++t) {
-    workers.emplace_back([&interceptor, calls_per_thread]() {
-      for (int i = 0; i < calls_per_thread; ++i) {
+  // Concurrent readers / dispatches
+  for (int t = 0; t < reader_threads; ++t) {
+    workers.emplace_back([&interceptor, calls_per_reader]() {
+      for (int i = 0; i < calls_per_reader; ++i) {
         interceptor->DispatchDirectJsi("concurrent", "ping", {});
       }
     });
   }
 
-  for (auto& w : workers) {
-    w.join();
+  // Concurrent writers / registrations
+  for (int w = 0; w < writer_threads; ++w) {
+    workers.emplace_back([&interceptor, w, registrations_per_writer]() {
+      for (int i = 0; i < registrations_per_writer; ++i) {
+        std::string mod = "dyn_" + std::to_string(w);
+        std::string meth = "fn_" + std::to_string(i);
+        interceptor->RegisterNativeMethod(mod, meth, [](const std::vector<JsiValueVariant>&) -> JsiValueVariant {
+          return true;
+        });
+      }
+    });
   }
 
-  assert(interceptor->GetDirectJsiDispatches() == (threads_count * calls_per_thread));
-  std::cout << "  [PASS] TestThreadSafety succeeded with " << interceptor->GetDirectJsiDispatches() << " dispatches." << std::endl;
+  for (auto& worker : workers) {
+    worker.join();
+  }
+
+  assert(interceptor->GetDirectJsiDispatches() == (reader_threads * calls_per_reader));
+  assert(interceptor->HasRegisteredMethod("dyn_0", "fn_0"));
+  std::cout << "  [PASS] TestThreadSafety succeeded with " << interceptor->GetDirectJsiDispatches() << " dispatches under concurrent mutation." << std::endl;
 }
 
 int main() {
@@ -187,6 +265,7 @@ int main() {
   std::cout << "=========================================================" << std::endl;
 
   TestHermesRuntimeAdapter();
+  TestCodegenNativeModule();
   TestLegacyBridgeInterceptor();
   TestWasiHostModule();
   TestBridgePerformanceBenchmark();

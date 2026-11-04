@@ -15,12 +15,13 @@ export class WasiHostContext {
       preopenedPaths: [],
       ...config
     };
-    this.memory = new Uint8Array(64 * 1024); // 64KB initial
+    this.memory = new Uint8Array(64 * 1024); // 64KB initial 1 WASM page
   }
 
-  public writeString(offset: number, value: string): number {
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(value);
+  public writeBytes(offset: number, bytes: Uint8Array): number {
+    if (offset < 0 || !Number.isInteger(offset)) {
+      throw new Error(`WASI memory out-of-bounds: invalid negative offset ${offset}`);
+    }
     if (offset + bytes.length > this.memory.length) {
       this.growMemory(offset + bytes.length);
     }
@@ -28,11 +29,24 @@ export class WasiHostContext {
     return bytes.length;
   }
 
-  public readString(offset: number, length: number): string {
+  public readBytes(offset: number, length: number): Uint8Array {
+    if (offset < 0 || length < 0 || !Number.isInteger(offset) || !Number.isInteger(length)) {
+      throw new Error(`WASI memory out-of-bounds: invalid offset ${offset} or length ${length}`);
+    }
     if (offset + length > this.memory.length) {
       throw new Error(`WASI memory out-of-bounds: read at ${offset} length ${length} exceeds size ${this.memory.length}`);
     }
-    const slice = this.memory.slice(offset, offset + length);
+    return this.memory.slice(offset, offset + length);
+  }
+
+  public writeString(offset: number, value: string): number {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(value);
+    return this.writeBytes(offset, bytes);
+  }
+
+  public readString(offset: number, length: number): string {
+    const slice = this.readBytes(offset, length);
     const decoder = new TextDecoder();
     return decoder.decode(slice);
   }

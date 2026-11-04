@@ -6,6 +6,7 @@
 #include <functional>
 #include <chrono>
 #include <atomic>
+#include <shared_mutex>
 
 namespace lynxfita {
 
@@ -46,6 +47,7 @@ class LegacyBridgeInterceptor : public HostObject {
     return module + "::" + method;
   }
 
+  mutable std::shared_mutex mutex_;
   std::unordered_map<std::string, DirectNativeHandler> registered_methods_;
   std::atomic<uint64_t> direct_jsi_dispatches_{0};
   std::atomic<uint64_t> legacy_json_dispatches_{0};

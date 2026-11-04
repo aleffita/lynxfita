@@ -27,4 +27,8 @@ test('JsiCodeGenerator produces clean C++ header', () => {
   assert.ok(header.includes('virtual double readTemperature(std::string sensorId) = 0;'));
   assert.ok(header.includes('virtual bool calibrate() = 0;'));
   assert.ok(header.includes('"readTemperature", "calibrate"'));
+  assert.ok(header.includes('JsiValueVariant InvokeMethod(const std::string& method_name'));
+  assert.ok(header.includes('JsiValueVariant GetProperty(const std::string& name) override'));
+  assert.ok(header.includes('method_name == "readTemperature"'));
+  assert.ok(header.includes('this->readTemperature(arg_sensorId)'));
 });

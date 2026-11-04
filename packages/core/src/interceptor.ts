@@ -56,10 +56,27 @@ export class BridgeInterceptor {
     // Fallback path to NativeModules legacy bridge
     this.legacyCount++;
     if (typeof globalThis.NativeModules !== 'undefined' && globalThis.NativeModules[module]) {
+      const legacyMod = globalThis.NativeModules[module];
+      if (typeof legacyMod[method] === 'function') {
+        try {
+          const ret = legacyMod[method](params);
+          return {
+            code: 0,
+            data: ret,
+            msg: 'ok (legacy json bridge fallback invocation)'
+          };
+        } catch (err: any) {
+          return {
+            code: -1,
+            data: null,
+            msg: `Legacy bridge execution error: ${err?.message || String(err)}`
+          };
+        }
+      }
       return {
-        code: 0,
-        data: `legacy_fallback_${module}_${method}`,
-        msg: 'ok (legacy json bridge fallback)'
+        code: -404,
+        data: null,
+        msg: `Legacy method not found: ${key}`
       };
     }
 

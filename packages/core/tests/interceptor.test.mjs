@@ -53,3 +53,26 @@ test('HermesRuntimeSession AOT bundle verification', () => {
     session.registerBundle({ ...validBundle, magic: 0x12345678 });
   }, /Invalid Hermes AOT bundle signature/);
 });
+
+test('BridgeInterceptor legacy NativeModules fallback execution', () => {
+  const interceptor = new BridgeInterceptor();
+  globalThis.NativeModules = {
+    legacyStorage: {
+      readConfig: (params) => ({ mode: 'production', key: params.key })
+    }
+  };
+
+  const res = interceptor.dispatch('legacyStorage', 'readConfig', { key: 'db_host' });
+  assert.equal(res.code, 0);
+  assert.deepEqual(res.data, { mode: 'production', key: 'db_host' });
+  assert.ok(res.msg.includes('legacy json bridge fallback invocation'));
+
+  const stats = interceptor.getStats();
+  assert.equal(stats.legacyCount, 1);
+  assert.equal(stats.bypassRatio, 0);
+
+  // Missing method on legacy module
+  const missingRes = interceptor.dispatch('legacyStorage', 'nonExistent', {});
+  assert.equal(missingRes.code, -404);
+});
+

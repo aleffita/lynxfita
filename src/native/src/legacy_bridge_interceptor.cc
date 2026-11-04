@@ -69,12 +69,14 @@ bool LegacyBridgeInterceptor::RegisterNativeMethod(const std::string& module_nam
   if (module_name.empty() || method_name.empty() || !handler) {
     return false;
   }
+  std::unique_lock<std::shared_mutex> lock(mutex_);
   registered_methods_[BuildKey(module_name, method_name)] = std::move(handler);
   return true;
 }
 
 bool LegacyBridgeInterceptor::HasRegisteredMethod(const std::string& module_name,
                                                   const std::string& method_name) const {
+  std::shared_lock<std::shared_mutex> lock(mutex_);
   return registered_methods_.find(BuildKey(module_name, method_name)) != registered_methods_.end();
 }
 
@@ -84,24 +86,23 @@ ExecutionResult LegacyBridgeInterceptor::DispatchDirectJsi(const std::string& mo
   ExecutionResult res;
   const auto start = std::chrono::steady_clock::now();
 
-  auto it = registered_methods_.find(BuildKey(module_name, method_name));
-  if (it == registered_methods_.end()) {
-    res.status = StatusCode::MethodNotFound;
-    res.error_message = "Method not registered in Direct JSI registry: " + module_name + "." + method_name;
-    return res;
+  DirectNativeHandler handler;
+  {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    auto it = registered_methods_.find(BuildKey(module_name, method_name));
+    if (it == registered_methods_.end()) {
+      res.status = StatusCode::MethodNotFound;
+      res.error_message = "Method not registered in Direct JSI registry: " + module_name + "." + method_name;
+      return res;
+    }
+    handler = it->second;
   }
 
   try {
-    auto ret = it->second(params);
+    auto ret = handler(params);
     direct_jsi_dispatches_.fetch_add(1, std::memory_order_relaxed);
     res.status = StatusCode::Ok;
-    if (std::holds_alternative<std::string>(ret)) {
-      res.result_payload = std::get<std::string>(ret);
-    } else if (std::holds_alternative<int64_t>(ret)) {
-      res.result_payload = std::to_string(std::get<int64_t>(ret));
-    } else if (std::holds_alternative<bool>(ret)) {
-      res.result_payload = std::get<bool>(ret) ? "true" : "false";
-    }
+    res.result_payload = JsiValueToString(ret);
   } catch (const std::exception& e) {
     res.status = StatusCode::ExecutionError;
     res.error_message = e.what();
@@ -121,17 +122,22 @@ ExecutionResult LegacyBridgeInterceptor::DispatchLegacyJson(const std::string& m
 
   // Fallback serialization path
   std::vector<JsiValueVariant> params = { json_payload };
-  auto it = registered_methods_.find(BuildKey(module_name, method_name));
-  if (it == registered_methods_.end()) {
-    res.status = StatusCode::MethodNotFound;
-    res.error_message = "Method not found in legacy JSON bridge";
-    return res;
+  DirectNativeHandler handler;
+  {
+    std::shared_lock<std::shared_mutex> lock(mutex_);
+    auto it = registered_methods_.find(BuildKey(module_name, method_name));
+    if (it == registered_methods_.end()) {
+      res.status = StatusCode::MethodNotFound;
+      res.error_message = "Method not found in legacy JSON bridge";
+      return res;
+    }
+    handler = it->second;
   }
 
   try {
-    auto ret = it->second(params);
+    auto ret = handler(params);
     res.status = StatusCode::Ok;
-    res.result_payload = std::holds_alternative<std::string>(ret) ? std::get<std::string>(ret) : "ok";
+    res.result_payload = JsiValueToString(ret);
   } catch (const std::exception& e) {
     res.status = StatusCode::ExecutionError;
     res.error_message = e.what();

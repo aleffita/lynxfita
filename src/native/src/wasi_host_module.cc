@@ -1,6 +1,7 @@
 #include "lynxfita/wasi_host_module.h"
 #include <stdexcept>
 #include <chrono>
+#include <cstring>
 
 namespace lynxfita {
 
@@ -94,13 +95,7 @@ ExecutionResult WasiHostModule::Execute(const std::string& entrypoint, const std
   try {
     auto val = it->second(args);
     res.status = StatusCode::Ok;
-    if (std::holds_alternative<std::string>(val)) {
-      res.result_payload = std::get<std::string>(val);
-    } else if (std::holds_alternative<int64_t>(val)) {
-      res.result_payload = std::to_string(std::get<int64_t>(val));
-    } else if (std::holds_alternative<bool>(val)) {
-      res.result_payload = std::get<bool>(val) ? "true" : "false";
-    }
+    res.result_payload = JsiValueToString(val);
   } catch (const std::exception& e) {
     res.status = StatusCode::WasiTrap;
     res.error_message = std::string("WASI trap execution fault: ") + e.what();
@@ -109,6 +104,38 @@ ExecutionResult WasiHostModule::Execute(const std::string& entrypoint, const std
   const auto finish = std::chrono::steady_clock::now();
   res.execution_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count();
   return res;
+}
+
+bool WasiHostModule::WriteMemory(size_t offset, const uint8_t* data, size_t length) {
+  if (!data || length == 0) {
+    return true;
+  }
+  if (offset + length > capabilities_.memory_limit_bytes) {
+    return false; // Exceeds sandbox capability ceiling
+  }
+  if (offset + length > linear_memory_.size()) {
+    linear_memory_.resize(offset + length, 0);
+  }
+  std::memcpy(linear_memory_.data() + offset, data, length);
+  return true;
+}
+
+bool WasiHostModule::ReadMemory(size_t offset, size_t length, std::vector<uint8_t>& out_bytes) const {
+  if (offset + length > linear_memory_.size()) {
+    return false; // Out of bounds
+  }
+  out_bytes.resize(length);
+  std::memcpy(out_bytes.data(), linear_memory_.data() + offset, length);
+  return true;
+}
+
+bool WasiHostModule::GrowMemory(size_t additional_bytes) {
+  size_t target_size = linear_memory_.size() + additional_bytes;
+  if (target_size > capabilities_.memory_limit_bytes) {
+    return false;
+  }
+  linear_memory_.resize(target_size, 0);
+  return true;
 }
 
 } // namespace lynxfita

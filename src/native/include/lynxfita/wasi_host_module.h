@@ -35,6 +35,10 @@ class WasiHostModule : public HostObject {
 
   ExecutionResult Execute(const std::string& entrypoint, const std::vector<JsiValueVariant>& args);
 
+  bool WriteMemory(size_t offset, const uint8_t* data, size_t length);
+  bool ReadMemory(size_t offset, size_t length, std::vector<uint8_t>& out_bytes) const;
+  bool GrowMemory(size_t additional_bytes);
+
   size_t GetMemoryUsage() const { return linear_memory_.size(); }
   const WasiCapabilities& GetCapabilities() const { return capabilities_; }
 
