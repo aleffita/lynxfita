@@ -2,6 +2,9 @@
 #include <chrono>
 #include <stdexcept>
 #include <algorithm>
+#include <cstring>
+#include <cmath>
+#include <cstdint>
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -101,7 +104,7 @@ bool StationaryBuffer::IsPageLocked() const {
 }
 
 bool StationaryBuffer::Write(size_t offset, const uint8_t* src, size_t length) {
-  if (!data_ || !src || (offset + length > capacity_)) {
+  if (!data_ || !src || offset > capacity_ || length > capacity_ - offset) {
     return false;
   }
   std::memcpy(data_ + offset, src, length);
@@ -109,7 +112,7 @@ bool StationaryBuffer::Write(size_t offset, const uint8_t* src, size_t length) {
 }
 
 bool StationaryBuffer::Read(size_t offset, uint8_t* dest, size_t length) const {
-  if (!data_ || !dest || (offset + length > capacity_)) {
+  if (!data_ || !dest || offset > capacity_ || length > capacity_ - offset) {
     return false;
   }
   std::memcpy(dest, data_ + offset, length);
@@ -117,7 +120,8 @@ bool StationaryBuffer::Read(size_t offset, uint8_t* dest, size_t length) const {
 }
 
 bool StationaryBuffer::PackSimdVector4f(size_t offset, float x, float y, float z, float w) {
-  if (!data_ || offset + sizeof(float) * 4 > capacity_) {
+  constexpr size_t kVecBytes = sizeof(float) * 4;
+  if (!data_ || offset > capacity_ || kVecBytes > capacity_ - offset) {
     return false;
   }
 #if defined(__x86_64__) || defined(_M_X64)
@@ -134,7 +138,8 @@ bool StationaryBuffer::PackSimdVector4f(size_t offset, float x, float y, float z
 }
 
 bool StationaryBuffer::UnpackSimdVector4f(size_t offset, float& x, float& y, float& z, float& w) const {
-  if (!data_ || offset + sizeof(float) * 4 > capacity_) {
+  constexpr size_t kVecBytes = sizeof(float) * 4;
+  if (!data_ || offset > capacity_ || kVecBytes > capacity_ - offset) {
     return false;
   }
 #if defined(__x86_64__) || defined(_M_X64)
@@ -157,10 +162,11 @@ bool StationaryBuffer::UnpackSimdVector4f(size_t offset, float& x, float& y, flo
 
 bool StationaryBuffer::SimdVectorFmaAdd(size_t src_a_offset, size_t src_b_offset, size_t dst_offset, size_t float_count, float scale) {
   if (!data_) return false;
+  if (float_count > capacity_ / sizeof(float)) return false;
   size_t total_bytes = float_count * sizeof(float);
-  if (src_a_offset + total_bytes > capacity_ ||
-      src_b_offset + total_bytes > capacity_ ||
-      dst_offset + total_bytes > capacity_) {
+  if (src_a_offset > capacity_ || total_bytes > capacity_ - src_a_offset ||
+      src_b_offset > capacity_ || total_bytes > capacity_ - src_b_offset ||
+      dst_offset > capacity_ || total_bytes > capacity_ - dst_offset) {
     return false;
   }
 
@@ -261,7 +267,8 @@ DmaTransferResult DmaEibEngine::ExecuteTransfer(const DmaTransferRequest& req) {
   }
 
   size_t cap = stationary_buffer_->Capacity();
-  if (req.source_offset + req.byte_count > cap || req.destination_offset + req.byte_count > cap) {
+  if (req.source_offset > cap || req.byte_count > cap - req.source_offset ||
+      req.destination_offset > cap || req.byte_count > cap - req.destination_offset) {
     result.error_message = "DMA bounds overflow: transfer exceeds stationary buffer capacity";
     return result;
   }
@@ -338,20 +345,45 @@ std::vector<std::string> StationaryDmaHostObject::GetPropertyNames() const {
   return {"capacity", "totalTransfers", "totalBytesTransferred", "ring0Transfers", "ring1Transfers", "isCacheLineAligned", "transfer", "packSimd", "fmaAdd"};
 }
 
+static bool ExtractInt64(const JsiValueVariant& v, int64_t& out) {
+  if (std::holds_alternative<int64_t>(v)) {
+    out = std::get<int64_t>(v);
+    return true;
+  }
+  if (std::holds_alternative<double>(v)) {
+    out = static_cast<int64_t>(std::get<double>(v));
+    return true;
+  }
+  return false;
+}
+
+static bool ExtractFloat(const JsiValueVariant& v, float& out) {
+  if (std::holds_alternative<double>(v)) {
+    out = static_cast<float>(std::get<double>(v));
+    return true;
+  }
+  if (std::holds_alternative<int64_t>(v)) {
+    out = static_cast<float>(std::get<int64_t>(v));
+    return true;
+  }
+  return false;
+}
+
 JsiValueVariant StationaryDmaHostObject::InvokeMethod(const std::string& name, const std::vector<JsiValueVariant>& args) {
   if (name == "transfer" && args.size() >= 4) {
-    if (!std::holds_alternative<int64_t>(args[0]) ||
-        !std::holds_alternative<int64_t>(args[1]) ||
-        !std::holds_alternative<int64_t>(args[2]) ||
-        !std::holds_alternative<int64_t>(args[3])) {
+    int64_t ch_id = 0, src_off = 0, dst_off = 0, bytes = 0;
+    if (!ExtractInt64(args[0], ch_id) ||
+        !ExtractInt64(args[1], src_off) ||
+        !ExtractInt64(args[2], dst_off) ||
+        !ExtractInt64(args[3], bytes)) {
       return std::string("Error: invalid arguments, expected (channelId, srcOffset, dstOffset, byteCount)");
     }
 
     DmaTransferRequest req;
-    req.channel_id = static_cast<uint32_t>(std::get<int64_t>(args[0]));
-    req.source_offset = static_cast<uint64_t>(std::get<int64_t>(args[1]));
-    req.destination_offset = static_cast<uint64_t>(std::get<int64_t>(args[2]));
-    req.byte_count = static_cast<uint32_t>(std::get<int64_t>(args[3]));
+    req.channel_id = static_cast<uint32_t>(ch_id);
+    req.source_offset = static_cast<uint64_t>(src_off);
+    req.destination_offset = static_cast<uint64_t>(dst_off);
+    req.byte_count = static_cast<uint32_t>(bytes);
     req.is_simd_vector_aligned = true;
 
     auto res = engine_->ExecuteTransfer(req);
@@ -362,21 +394,31 @@ JsiValueVariant StationaryDmaHostObject::InvokeMethod(const std::string& name, c
   }
 
   if (name == "packSimd" && args.size() >= 5) {
-    size_t offset = static_cast<size_t>(std::get<int64_t>(args[0]));
-    float x = static_cast<float>(std::holds_alternative<double>(args[1]) ? std::get<double>(args[1]) : std::get<int64_t>(args[1]));
-    float y = static_cast<float>(std::holds_alternative<double>(args[2]) ? std::get<double>(args[2]) : std::get<int64_t>(args[2]));
-    float z = static_cast<float>(std::holds_alternative<double>(args[3]) ? std::get<double>(args[3]) : std::get<int64_t>(args[3]));
-    float w = static_cast<float>(std::holds_alternative<double>(args[4]) ? std::get<double>(args[4]) : std::get<int64_t>(args[4]));
-    return engine_->GetStationaryBuffer().PackSimdVector4f(offset, x, y, z, w);
+    int64_t offset = 0;
+    float x = 0, y = 0, z = 0, w = 0;
+    if (!ExtractInt64(args[0], offset) ||
+        !ExtractFloat(args[1], x) ||
+        !ExtractFloat(args[2], y) ||
+        !ExtractFloat(args[3], z) ||
+        !ExtractFloat(args[4], w)) {
+      return false;
+    }
+    return engine_->GetStationaryBuffer().PackSimdVector4f(static_cast<size_t>(offset), x, y, z, w);
   }
 
   if (name == "fmaAdd" && args.size() >= 5) {
-    size_t a_off = static_cast<size_t>(std::get<int64_t>(args[0]));
-    size_t b_off = static_cast<size_t>(std::get<int64_t>(args[1]));
-    size_t dst_off = static_cast<size_t>(std::get<int64_t>(args[2]));
-    size_t count = static_cast<size_t>(std::get<int64_t>(args[3]));
-    float scale = static_cast<float>(std::holds_alternative<double>(args[4]) ? std::get<double>(args[4]) : std::get<int64_t>(args[4]));
-    return engine_->GetStationaryBuffer().SimdVectorFmaAdd(a_off, b_off, dst_off, count, scale);
+    int64_t a_off = 0, b_off = 0, dst_off = 0, count = 0;
+    float scale = 0;
+    if (!ExtractInt64(args[0], a_off) ||
+        !ExtractInt64(args[1], b_off) ||
+        !ExtractInt64(args[2], dst_off) ||
+        !ExtractInt64(args[3], count) ||
+        !ExtractFloat(args[4], scale)) {
+      return false;
+    }
+    return engine_->GetStationaryBuffer().SimdVectorFmaAdd(
+        static_cast<size_t>(a_off), static_cast<size_t>(b_off), static_cast<size_t>(dst_off),
+        static_cast<size_t>(count), scale);
   }
 
   return false;

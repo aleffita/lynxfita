@@ -2,6 +2,8 @@
 #include <stdexcept>
 #include <chrono>
 #include <cstring>
+#include <cstdint>
+#include <cmath>
 
 namespace lynxfita {
 
@@ -110,10 +112,10 @@ bool WasiHostModule::WriteMemory(size_t offset, const uint8_t* data, size_t leng
   if (!data || length == 0) {
     return true;
   }
-  if (offset + length > capabilities_.memory_limit_bytes) {
+  if (offset > capabilities_.memory_limit_bytes || length > capabilities_.memory_limit_bytes - offset) {
     return false; // Exceeds sandbox capability ceiling
   }
-  if (offset + length > linear_memory_.size()) {
+  if (offset > linear_memory_.size() || length > linear_memory_.size() - offset) {
     linear_memory_.resize(offset + length, 0);
   }
   std::memcpy(linear_memory_.data() + offset, data, length);
@@ -121,7 +123,7 @@ bool WasiHostModule::WriteMemory(size_t offset, const uint8_t* data, size_t leng
 }
 
 bool WasiHostModule::ReadMemory(size_t offset, size_t length, std::vector<uint8_t>& out_bytes) const {
-  if (offset + length > linear_memory_.size()) {
+  if (offset > linear_memory_.size() || length > linear_memory_.size() - offset) {
     return false; // Out of bounds
   }
   out_bytes.resize(length);
@@ -130,11 +132,10 @@ bool WasiHostModule::ReadMemory(size_t offset, size_t length, std::vector<uint8_
 }
 
 bool WasiHostModule::GrowMemory(size_t additional_bytes) {
-  size_t target_size = linear_memory_.size() + additional_bytes;
-  if (target_size > capabilities_.memory_limit_bytes) {
+  if (additional_bytes > capabilities_.memory_limit_bytes - linear_memory_.size()) {
     return false;
   }
-  linear_memory_.resize(target_size, 0);
+  linear_memory_.resize(linear_memory_.size() + additional_bytes, 0);
   return true;
 }
 

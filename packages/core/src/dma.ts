@@ -30,7 +30,8 @@ export class StationaryDmaClient {
     }
 
     // High-performance typed array in-memory DMA lane simulation
-    if (sourceOffset + byteCount > this.capacity || destinationOffset + byteCount > this.capacity) {
+    if (sourceOffset < 0 || destinationOffset < 0 || byteCount < 0 ||
+        sourceOffset + byteCount > this.capacity || destinationOffset + byteCount > this.capacity) {
       throw new Error('DMA bounds overflow: transfer exceeds stationary buffer capacity');
     }
 
@@ -47,7 +48,7 @@ export class StationaryDmaClient {
       return globalThis.__lynxfita_stationary_dma.packSimd(offset, x, y, z, w);
     }
 
-    if (offset + 16 > this.capacity) return false;
+    if (offset < 0 || offset + 16 > this.capacity) return false;
     const view = new DataView(this.buffer.buffer, this.buffer.byteOffset + offset, 16);
     view.setFloat32(0, x, true);
     view.setFloat32(4, y, true);
@@ -57,7 +58,7 @@ export class StationaryDmaClient {
   }
 
   public unpackSimd4f(offset: number): [number, number, number, number] {
-    if (offset + 16 > this.capacity) {
+    if (offset < 0 || offset + 16 > this.capacity) {
       throw new Error('Buffer overflow while reading SIMD vector');
     }
     const view = new DataView(this.buffer.buffer, this.buffer.byteOffset + offset, 16);

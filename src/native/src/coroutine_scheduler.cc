@@ -127,6 +127,32 @@ std::vector<WorkerExecutionRecord> CoroutineScheduler::DispatchParallelAll(
     return {};
   }
 
+  if (workers_.empty()) {
+    std::vector<WorkerExecutionRecord> records;
+    for (const auto& [name, fn] : tasks) {
+      auto start = std::chrono::steady_clock::now();
+      WorkerExecutionRecord rec;
+      rec.task_name = name;
+      rec.thread_id = std::this_thread::get_id();
+      try {
+        fn();
+        rec.success = true;
+      } catch (const std::exception& e) {
+        rec.success = false;
+        rec.error_message = e.what();
+      } catch (...) {
+        rec.success = false;
+        rec.error_message = "Unknown exception in parallel task execution";
+      }
+      auto finish = std::chrono::steady_clock::now();
+      rec.duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count();
+      records.push_back(rec);
+    }
+    std::lock_guard<std::mutex> rec_lock(records_mutex_);
+    last_records_ = records;
+    return records;
+  }
+
   struct SyncBatch {
     std::mutex mtx;
     std::condition_variable cv;
@@ -236,6 +262,24 @@ JsiValueVariant CoroutineHostObject::InvokeMethod(const std::string& name, const
     std::string coro_name = std::get<std::string>(args[0]);
     auto steps = scheduler_->RunToCompletion(coro_name);
     return static_cast<int64_t>(steps.size());
+  }
+
+  if (name == "dispatchParallel") {
+    int64_t count = 1;
+    if (!args.empty()) {
+      if (std::holds_alternative<int64_t>(args[0])) {
+        count = std::get<int64_t>(args[0]);
+      } else if (std::holds_alternative<double>(args[0])) {
+        count = static_cast<int64_t>(std::get<double>(args[0]));
+      }
+    }
+    if (count <= 0) count = 1;
+    std::vector<std::pair<std::string, std::function<void()>>> tasks;
+    for (int64_t i = 0; i < count; ++i) {
+      tasks.push_back({"jsi_worker_task_" + std::to_string(i), []() {}});
+    }
+    auto records = scheduler_->DispatchParallelAll(tasks);
+    return static_cast<int64_t>(records.size());
   }
 
   return false;

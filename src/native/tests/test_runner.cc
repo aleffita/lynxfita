@@ -163,9 +163,12 @@ void TestWasiHostModule() {
   assert(read_data.size() == 4);
   assert(read_data[0] == 0xAA && read_data[3] == 0xDD);
 
-  // Test memory limit boundary enforcement
+  // Test memory limit boundary enforcement & integer overflow protection
   const uint8_t dummy[10] = {0};
   assert(!wasi->WriteMemory(caps.memory_limit_bytes + 1, dummy, sizeof(dummy)));
+  assert(!wasi->WriteMemory(static_cast<size_t>(-5), dummy, sizeof(dummy)));
+  std::vector<uint8_t> overflow_read;
+  assert(!wasi->ReadMemory(static_cast<size_t>(-5), 10, overflow_read));
 
   // Register WASI export returning double / string
   wasi->RegisterExport("sign_payload", [](const std::vector<JsiValueVariant>&) -> JsiValueVariant {
@@ -324,7 +327,7 @@ void TestDmaEibEngine() {
   assert(engine->GetStationaryBuffer().UnpackSimdVector4f(256, dx, dy, dz, dw));
   assert(dx == 1.5f && dy == 2.5f && dz == 3.5f && dw == 4.5f);
 
-  // 5. Boundary overflow enforcement
+  // 5. Boundary overflow enforcement & integer wrap protection
   DmaTransferRequest overflow_req;
   overflow_req.channel_id = 1;
   overflow_req.source_offset = 0;
@@ -333,6 +336,14 @@ void TestDmaEibEngine() {
   auto err_res = engine->ExecuteTransfer(overflow_req);
   assert(!err_res.success);
   assert(err_res.error_message.find("overflow") != std::string::npos);
+
+  // Integer overflow attacks on StationaryBuffer
+  const uint8_t oflow_data[16] = {0};
+  uint8_t oflow_dest[16] = {0};
+  assert(!engine->GetStationaryBuffer().Write(static_cast<size_t>(-5), oflow_data, 10));
+  assert(!engine->GetStationaryBuffer().Read(static_cast<size_t>(-5), oflow_dest, 10));
+  assert(!engine->GetStationaryBuffer().PackSimdVector4f(static_cast<size_t>(-5), 1.0f, 2.0f, 3.0f, 4.0f));
+  assert(!engine->GetStationaryBuffer().SimdVectorFmaAdd(0, 0, 0, static_cast<size_t>(-1), 1.0f));
 
   // 6. Test StationaryDmaHostObject JSI wrapper
   auto host_obj = std::make_shared<StationaryDmaHostObject>(engine);
@@ -349,6 +360,17 @@ void TestDmaEibEngine() {
   auto jsi_res = host_obj->InvokeMethod("transfer", jsi_transfer_args);
   assert(std::holds_alternative<std::string>(jsi_res));
   assert(std::get<std::string>(jsi_res).find("DMA transfer complete") != std::string::npos);
+
+  // Test JSI invocation with double arguments (standard from JS runtime)
+  std::vector<JsiValueVariant> jsi_double_args = {
+    1.0,
+    256.0,
+    512.0,
+    16.0
+  };
+  auto jsi_double_res = host_obj->InvokeMethod("transfer", jsi_double_args);
+  assert(std::holds_alternative<std::string>(jsi_double_res));
+  assert(std::get<std::string>(jsi_double_res).find("DMA transfer complete") != std::string::npos);
 
   std::cout << "  [PASS] TestDmaEibEngine succeeded." << std::endl;
 }
@@ -420,6 +442,20 @@ void TestCoroutineScheduler() {
   assert(std::holds_alternative<std::string>(jsi_step));
   assert(std::get<std::string>(jsi_step) == "chunk_alpha");
 
+  auto jsi_dispatch = host_obj->InvokeMethod("dispatchParallel", { static_cast<int64_t>(3) });
+  assert(std::holds_alternative<int64_t>(jsi_dispatch));
+  assert(std::get<int64_t>(jsi_dispatch) == 3);
+
+  // 4. Test zero-worker scheduler fallback (verifies no deadlock occurs)
+  CoroutineScheduler zero_scheduler(0);
+  assert(zero_scheduler.GetActiveWorkerCount() == 0);
+  std::vector<std::pair<std::string, std::function<void()>>> fallback_tasks = {
+    {"fallback_0", []() {}}
+  };
+  auto fallback_records = zero_scheduler.DispatchParallelAll(fallback_tasks);
+  assert(fallback_records.size() == 1);
+  assert(fallback_records[0].success);
+
   std::cout << "  [PASS] TestCoroutineScheduler succeeded." << std::endl;
 }
 
@@ -486,9 +522,16 @@ void TestHermesCompiler() {
   // 2. Validate magic bytes: 0x1F, 'H', 'B', 'C'
   assert(HermesRuntimeCompiler::ValidateBytecode(res.bytecode.data(), res.bytecode.size()));
   assert(HermesRuntimeCompiler::ExtractSourceHash(res.bytecode.data(), res.bytecode.size()) == res.source_fnv_hash);
+  assert(!HermesRuntimeCompiler::ValidateBytecode(nullptr, 0));
+  assert(HermesRuntimeCompiler::ExtractSourceHash(nullptr, 0) == 0);
 
   // 3. Hot reload bundle connected to runtime adapter
   assert(compiler->HotReloadBundle("main_bundle", res.bytecode.data(), res.bytecode.size()));
+  assert(compiler->GetLoadedBundleCount() == 1);
+
+  // Corrupt bytecode must fail hot reload
+  const uint8_t corrupt_bytes[] = {0x00, 0x01, 0x02, 0x03};
+  assert(!compiler->HotReloadBundle("corrupt_bundle", corrupt_bytes, sizeof(corrupt_bytes)));
   assert(compiler->GetLoadedBundleCount() == 1);
 
   // 4. JSI HostObject wrapper test

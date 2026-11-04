@@ -45,9 +45,9 @@ export class HermesCompilerClient {
     };
   }
 
-  public static hotReload(bundleName: string, bytecodeHex: string): boolean {
+  public static hotReload(bundleName: string, sourceCodeOrBytecode: string): boolean {
     if (typeof globalThis.__lynxfita_hermes_compiler !== 'undefined') {
-      return Boolean(globalThis.__lynxfita_hermes_compiler.hotReload(bundleName, bytecodeHex));
+      return Boolean(globalThis.__lynxfita_hermes_compiler.hotReload(bundleName, sourceCodeOrBytecode));
     }
     return true;
   }
