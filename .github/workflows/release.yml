@@ -76,7 +76,10 @@ jobs:
           pnpm --filter "@lynxfita/cli" run build
 
       - name: Build Example Packages
-        run: pnpm --filter "./examples/*" run build
+        run: |
+          pnpm --filter "@lynxfita/example-weather-showcase" run build
+          pnpm --filter "desktop-hermes-app" run build
+          pnpm --filter "super-app" run build
 
       - name: Run Tests
         run: pnpm -r run test
@@ -192,7 +195,9 @@ jobs:
           pnpm --filter "@lynxfita/wasi-runtime" run build
           pnpm --filter "@lynxfita/updater" run build
           pnpm --filter "@lynxfita/cli" run build
-          pnpm --filter "./examples/*" run build
+          pnpm --filter "@lynxfita/example-weather-showcase" run build
+          pnpm --filter "desktop-hermes-app" run build
+          pnpm --filter "super-app" run build
 
       - name: Publish Scoped npm Packages to GitHub Packages
         run: |

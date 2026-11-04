@@ -47,7 +47,10 @@ jobs:
           pnpm --filter "@lynxfita/cli" run build
 
       - name: Build Example Packages
-        run: pnpm --filter "./examples/*" run build
+        run: |
+          pnpm --filter "@lynxfita/example-weather-showcase" run build
+          pnpm --filter "desktop-hermes-app" run build
+          pnpm --filter "super-app" run build
 
       - name: Run Package Tests
         run: pnpm -r run test
