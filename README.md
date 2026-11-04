@@ -14,6 +14,12 @@
 [![Donate via Stripe](https://img.shields.io/badge/Donate-Stripe-635BFF?logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)
 [![Sponsor Alefita](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/aleffita)
 
+<p align="center">
+  <a href="https://donate.stripe.com/9B66oHaordEdf36erNfEk00">
+    <img src="https://img.shields.io/badge/Gostou%20do%20meu%20programa%3F-Apoie%20a%20pesquisa%20%F0%9F%96%A4%F0%9F%90%A7-635BFF?style=for-the-badge&logo=stripe&logoColor=white" alt="Gostou do meu programa? Apoie a pesquisa 🖤🐧" />
+  </a>
+</p>
+
 </div>
 
 ---
@@ -142,7 +148,19 @@ We follow a strict Gitflow model. All contributions must arrive via Pull Request
 
 LynxFita is an independent systems research initiative led by **Alef Oliveira (Alefita)** at **FitaLabs**.
 
-### Sponsorship & Financial Support
+> [!TIP]
+> ### 🖤🐧 *"Gostou do meu programa?"*
+> Ajude a manter a pesquisa viva apoiando com qualquer quantia! Quem sabe eu faça uma dashboard e libere alguns projetos privados pros top apoiadores — não garanto nada, mas seria de imensurável valor para a pesquisa se manter viva!
+>
+> <a href="https://donate.stripe.com/9B66oHaordEdf36erNfEk00">
+>   <img src="https://img.shields.io/badge/Apoiar%20via%20Stripe-%20%F0%9F%96%A4%F0%9F%90%A7%20FitaLabs-635BFF?style=for-the-badge&logo=stripe&logoColor=white" alt="Apoiar via Stripe" />
+> </a>
+> &nbsp;
+> <a href="https://github.com/sponsors/aleffita">
+>   <img src="https://img.shields.io/badge/Sponsor%20no%20GitHub-%20%E2%99%A5%20Alefita-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" />
+> </a>
+
+### Sponsorship & Financial Support Channels
 - **Direct Research Donation (Stripe)**: [donate.stripe.com/9B66oHaordEdf36erNfEk00](https://donate.stripe.com/9B66oHaordEdf36erNfEk00) *(Priority)*
 - **GitHub Sponsors**: [github.com/sponsors/aleffita](https://github.com/sponsors/aleffita)
 
