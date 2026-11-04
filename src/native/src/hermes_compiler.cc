@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <sstream>
 #include <regex>
+#include <cstring>
+#include <cstdint>
+#include <cmath>
 
 namespace lynxfita {
 
@@ -141,13 +144,16 @@ bool HermesRuntimeCompiler::HotReloadBundle(const std::string& bundle_name,
     return false;
   }
 
+  if (adapter_) {
+    auto eval_res = adapter_->EvaluateBytecode(bytecode_data, length, bundle_name);
+    if (!eval_res.IsSuccess()) {
+      return false;
+    }
+  }
+
   auto it = std::find(loaded_bundles_.begin(), loaded_bundles_.end(), bundle_name);
   if (it == loaded_bundles_.end()) {
     loaded_bundles_.push_back(bundle_name);
-  }
-
-  if (adapter_) {
-    adapter_->EvaluateBytecode(bytecode_data, length, bundle_name);
   }
   return true;
 }
