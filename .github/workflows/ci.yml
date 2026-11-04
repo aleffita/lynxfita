@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
 
+      - name: Setup Workspace Module Proxies
+        run: node scripts/setup-workspace.mjs
+
       - name: Build Core Runtime Package
         run: pnpm --filter "@lynxfita/core" run build
 
