@@ -11,14 +11,8 @@
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B)](https://en.cppreference.com/w/cpp/20)
 [![pnpm workspace](https://img.shields.io/badge/pnpm-workspace-orange?logo=pnpm)](https://pnpm.io/)
 [![Static Hermes](https://img.shields.io/badge/Hermes-static__h-0081FB?logo=meta)](https://github.com/meta/hermes/tree/static_h)
-[![Donate via Stripe](https://img.shields.io/badge/Donate-Stripe-635BFF?logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)
-[![Sponsor Alefita](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/aleffita)
-
-<p align="center">
-  <a href="https://donate.stripe.com/9B66oHaordEdf36erNfEk00">
-    <img src="https://img.shields.io/badge/Gostou%20do%20meu%20programa%3F-Apoie%20a%20pesquisa%20%F0%9F%96%A4%F0%9F%90%A7-635BFF?style=for-the-badge&logo=stripe&logoColor=white" alt="Gostou do meu programa? Apoie a pesquisa 🖤🐧" />
-  </a>
-</p>
+[![Sponsor](https://img.shields.io/badge/Sponsor-FitaLabs-635BFF?logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/aleffita)
 
 </div>
 
@@ -144,29 +138,19 @@ We follow a strict Gitflow model. All contributions must arrive via Pull Request
 
 ---
 
-## 7. Sponsors & Research
+## 7. Backing the Research & Patronage
 
-LynxFita is an independent systems research initiative led by **Alef Oliveira (Alefita)** at **FitaLabs**.
+<div align="center">
 
-> [!TIP]
-> ### 🖤🐧 *"Gostou do meu programa?"*
-> Ajude a manter a pesquisa viva apoiando com qualquer quantia! Quem sabe eu faça uma dashboard e libere alguns projetos privados pros top apoiadores — não garanto nada, mas seria de imensurável valor para a pesquisa se manter viva!
->
-> <a href="https://donate.stripe.com/9B66oHaordEdf36erNfEk00">
->   <img src="https://img.shields.io/badge/Apoiar%20via%20Stripe-%20%F0%9F%96%A4%F0%9F%90%A7%20FitaLabs-635BFF?style=for-the-badge&logo=stripe&logoColor=white" alt="Apoiar via Stripe" />
-> </a>
-> &nbsp;
-> <a href="https://github.com/sponsors/aleffita">
->   <img src="https://img.shields.io/badge/Sponsor%20no%20GitHub-%20%E2%99%A5%20Alefita-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" />
-> </a>
+### 🖤🐧 *"Enjoyed the session? Satisfied with how I perform?"*
 
-### Sponsorship & Financial Support Channels
-- **Direct Research Donation (Stripe)**: [donate.stripe.com/9B66oHaordEdf36erNfEk00](https://donate.stripe.com/9B66oHaordEdf36erNfEk00) *(Priority)*
-- **GitHub Sponsors**: [github.com/sponsors/aleffita](https://github.com/sponsors/aleffita)
+*Help keep a working girl's late-night research alive by tipping any amount. Who knows — I might spin up a private dashboard and unlock exclusive behind-the-scenes builds for my top patrons. No promises, just immeasurable value to keep the sessions going!*
 
-### Principal Researcher
-- **Alef Oliveira (Alefita)**: Systems & Research Engineer, FitaLabs
-- **Expository Site**: [aleffita.dev](https://aleffita.dev) &bull; **Contact**: [me@aleffita.dev](mailto:me@aleffita.dev)
+<br />
+
+[![Tip via Stripe](https://img.shields.io/badge/Tip_via_Stripe-🖤🐧_FitaLabs-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)&nbsp;&nbsp;&nbsp;[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/aleffita)
+
+</div>
 
 ---
 

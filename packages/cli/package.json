@@ -5,8 +5,11 @@
   "bin": {
     "lynxfita": "./bin/lynxfita.js"
   },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "test": "node --test tests/*.test.mjs",
     "lint": "echo cli:lint-ok"
   },

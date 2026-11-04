@@ -8,9 +8,18 @@
 
 namespace lynxfita {
 
+class HermesRuntimeAdapter;
+
+enum class HermesCompilerMode : uint8_t {
+  AOT = 0x01,
+  StaticTyped = 0x02,
+  StaticJitHybrid = 0x04
+};
+
 struct CompilationOptions {
   bool optimize_aot{true};
   bool static_h_mode{true};
+  bool hybrid_jit{false};
   bool generate_debug_symbols{false};
   uint32_t bytecode_version{96};
 };
@@ -18,6 +27,8 @@ struct CompilationOptions {
 struct CompilationResult {
   bool success{false};
   std::vector<uint8_t> bytecode;
+  uint64_t source_fnv_hash{0};
+  std::vector<std::string> symbols_table;
   std::string error_message;
   uint64_t compilation_time_ns{0};
 };
@@ -36,6 +47,12 @@ class HermesRuntimeCompiler {
   // Verify whether a buffer is valid Hermes bytecode
   static bool ValidateBytecode(const uint8_t* bytecode_data, size_t length);
 
+  // Extract 64-bit FNV source hash from bytecode
+  static uint64_t ExtractSourceHash(const uint8_t* bytecode_data, size_t length);
+
+  // Attach active runtime adapter for hot-reload re-evaluation
+  void AttachRuntimeAdapter(std::shared_ptr<HermesRuntimeAdapter> adapter);
+
   // Hot reload a bytecode bundle into an active runtime
   bool HotReloadBundle(const std::string& bundle_name, const uint8_t* bytecode_data, size_t length);
 
@@ -43,6 +60,7 @@ class HermesRuntimeCompiler {
 
  private:
   std::vector<std::string> loaded_bundles_;
+  std::shared_ptr<HermesRuntimeAdapter> adapter_;
 };
 
 // JSI HostObject exposing the compiler directly to JavaScript
