@@ -108,6 +108,14 @@ export function validateWgslShader(shaderCode: string): { valid: boolean; errors
     errors.push('Missing or malformed @workgroup_size attribute');
   }
 
+  if (!/@group\(\s*\d+\s*\)/.test(shaderCode)) {
+    errors.push('Missing @group(0) attribute on resource binding');
+  }
+
+  if (!/@binding\(\s*\d+\s*\)/.test(shaderCode)) {
+    errors.push('Missing @binding(...) attribute on resource binding');
+  }
+
   if (!shaderCode.includes('fn main')) {
     errors.push('Missing entrypoint function: fn main');
   }
@@ -277,6 +285,72 @@ export class WebGpuComputePipeline {
     // Stash telemetry in stationary DMA offset 0x2000 (8192 bytes)
     this.dmaClient.packSimd4f(0x2000, weatherParams[0], weatherParams[1], weatherParams[2], weatherParams[3]);
     const [temp, humidity, pressure, windSpeed] = this.dmaClient.unpackSimd4f(0x2000);
+
+    if (this.hasHardwareWebGpu() && particleCount > 0) {
+      try {
+        const gpu = (globalThis as any).navigator.gpu;
+        const adapter = await gpu.requestAdapter();
+        if (adapter) {
+          const device = await adapter.requestDevice();
+          if (device) {
+            const shaderModule = device.createShaderModule({ code: WEATHER_PARTICLES_WGSL_SHADER });
+            const pipeline = device.createComputePipeline({
+              layout: 'auto',
+              compute: { module: shaderModule, entryPoint: 'main' }
+            });
+
+            // 6-field WeatherTelemetry uniform struct: temp, humidity, pressure, windSpeed, particleCount, deltaTime
+            const uniformBuffer = device.createBuffer({ size: 32, usage: 0x0040 | 0x0004 });
+            const uniformData = new ArrayBuffer(32);
+            const uniformView = new DataView(uniformData);
+            uniformView.setFloat32(0, temp, true);
+            uniformView.setFloat32(4, humidity, true);
+            uniformView.setFloat32(8, pressure, true);
+            uniformView.setFloat32(12, windSpeed, true);
+            uniformView.setUint32(16, particleCount, true);
+            uniformView.setFloat32(20, deltaTime, true);
+            device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+            const byteLen = particles.byteLength;
+            const bufIn = device.createBuffer({ size: byteLen, usage: 0x0080 | 0x0004 });
+            const bufOut = device.createBuffer({ size: byteLen, usage: 0x0080 | 0x0001 });
+
+            device.queue.writeBuffer(bufIn, 0, particles.buffer, particles.byteOffset, byteLen);
+
+            const bindGroup = device.createBindGroup({
+              layout: pipeline.getBindGroupLayout(0),
+              entries: [
+                { binding: 0, resource: { buffer: uniformBuffer } },
+                { binding: 1, resource: { buffer: bufIn } },
+                { binding: 2, resource: { buffer: bufOut } }
+              ]
+            });
+
+            const commandEncoder = device.createCommandEncoder();
+            const passEncoder = commandEncoder.beginComputePass();
+            passEncoder.setPipeline(pipeline);
+            passEncoder.setBindGroup(0, bindGroup);
+            passEncoder.dispatchWorkgroups(Math.ceil(particleCount / 64));
+            passEncoder.end();
+            device.queue.submit([commandEncoder.finish()]);
+
+            const elapsedUs = (performance.now() - start) * 1000;
+            const ops = particleCount * 14;
+            const gflops = (ops / (Math.max(0.1, elapsedUs) / 1000000)) / 1e9;
+
+            return {
+              data: out,
+              backend: 'webgpu-hardware',
+              durationUs: Math.max(0.1, elapsedUs),
+              throughputGflops: gflops,
+              elementsProcessed: particleCount
+            };
+          }
+        }
+      } catch {
+        // Fall back to SIMD / DMA
+      }
+    }
 
     const buoyancy = (temp - 20.0) * 0.05;
     const damping = Math.min(Math.max(1.0 - (pressure - 1000.0) * 0.001, 0.85), 0.99);

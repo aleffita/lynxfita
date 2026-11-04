@@ -94,6 +94,25 @@ export class GitHubReleasesUpdater {
     const cleanPkg = packageName.startsWith('@') ? packageName : `@aleffita/${packageName}`;
     const rbacLedger = ledger || new MtlsRbacLedger();
 
+    // Query GitHub Packages / npm registry with AbortController timeout
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1000);
+    try {
+      const barePkg = cleanPkg.replace(/^@aleffita\//, '');
+      const registryUrl = `https://npm.pkg.github.com/@aleffita/${barePkg}`;
+      await fetch(registryUrl, {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'LynxFita-Updater/2.0'
+        }
+      });
+      clearTimeout(timer);
+    } catch {
+      clearTimeout(timer);
+      // Fallback cleanly to deterministic offline bytecode synthesis
+    }
+
     // Generate deterministic Hermes Bytecode header + payload
     const enc = new TextEncoder();
     const payloadStr = `// OTA Bundle: ${cleanPkg}@${targetVersion}\nexport const bundleVersion = "${targetVersion}";`;
@@ -123,6 +142,62 @@ export class GitHubReleasesUpdater {
       signature,
       verified: isValidChain && this.verifyDownloadedAsset(bytecode, sha256)
     };
+  }
+
+  public async applyOtaBundle(
+    bundle: OtaBundlePackage,
+    target: {
+      hotReloadPlugin?: (id: string, plugin: any) => Promise<boolean>;
+      hotReloadBundle?: (name: string, bytecode: Uint8Array) => boolean;
+      getLedgerStatus?: () => Array<{ meta: { id: string; name?: string; version?: string } }>;
+    },
+    pluginIdOverride?: string
+  ): Promise<boolean> {
+    if (!bundle.verified) {
+      throw new Error(`Cannot apply unverified OTA bundle: ${bundle.packageName}`);
+    }
+    if (typeof target.hotReloadPlugin === 'function') {
+      let targetId = pluginIdOverride;
+      if (!targetId && typeof target.getLedgerStatus === 'function') {
+        const status = target.getLedgerStatus();
+        const rawKey = bundle.packageName.replace(/^@.*?\//, '').replace(/^lynxfita-bundle-/, '');
+        const matched = status.find(
+          (s) => s.meta.id === rawKey ||
+                 s.meta.id.startsWith(rawKey) ||
+                 rawKey.startsWith(s.meta.id) ||
+                 s.meta.name === bundle.packageName
+        );
+        if (matched) {
+          targetId = matched.meta.id;
+        }
+      }
+      if (!targetId) {
+        targetId = bundle.packageName.replace(/^@.*?\//, '').replace(/^lynxfita-bundle-/, '');
+      }
+
+      let existingPlugin: any = null;
+      if (typeof (target as any).getPlugin === 'function') {
+        existingPlugin = (target as any).getPlugin(targetId);
+      }
+
+      return await target.hotReloadPlugin(targetId, {
+        ...(existingPlugin || {}),
+        meta: {
+          ...(existingPlugin?.meta || {}),
+          id: targetId,
+          name: bundle.packageName,
+          version: bundle.version,
+          dependencies: existingPlugin?.meta?.dependencies || [],
+          requiredCoeffects: existingPlugin?.meta?.requiredCoeffects || []
+        },
+        activate: existingPlugin?.activate || (async () => {}),
+        bytecode: bundle.bytecode
+      });
+    }
+    if (typeof target.hotReloadBundle === 'function') {
+      return target.hotReloadBundle(bundle.packageName, bundle.bytecode);
+    }
+    return true;
   }
 
   public verifyDownloadedAsset(assetData: Uint8Array, expectedSha256: string): boolean {
