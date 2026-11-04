@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*.*.*'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
   packages: write
@@ -31,16 +35,14 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Setup Ninja
-        uses: ashutoshvarma/setup-ninja@v1
-        with:
-          version: 1.11.1
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
 
-      - name: Build TypeScript Workspaces
-        run: pnpm -r run build
+      - name: Build TypeScript Packages
+        run: pnpm --filter "./packages/*" run build
+
+      - name: Build Example Packages
+        run: pnpm --filter "./examples/*" run build
 
       - name: Run Tests
         run: pnpm -r run test
@@ -57,11 +59,12 @@ jobs:
       - name: Package Release Archives
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Path dist/staging -Force
           New-Item -ItemType Directory -Path dist/release -Force
-          Copy-Item -Path build/native/lynxfita_native.lib -Destination dist/release/
-          Copy-Item -Path build/native/lynxfita_native_tests.exe -Destination dist/release/
+          Copy-Item -Path build/native/lynxfita_native.lib -Destination dist/staging/
+          Copy-Item -Path build/native/lynxfita_native_tests.exe -Destination dist/staging/
           Compress-Archive -Path src/native/include/* -DestinationPath dist/release/lynxfita-native-headers.zip
-          Compress-Archive -Path dist/release/* -DestinationPath dist/release/lynxfita-windows-x64-${{ github.ref_name }}.zip
+          Compress-Archive -Path dist/staging/* -DestinationPath dist/release/lynxfita-windows-x64-${{ github.ref_name }}.zip
           Get-FileHash -Algorithm SHA256 dist/release/*.zip | Out-File dist/release/checksums.sha256
 
       - name: Create GitHub Release
@@ -73,3 +76,26 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+
+  publish-container-package:
+    name: Build & Push GHCR Package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and Push Docker image
+        run: |
+          IMAGE_ID=ghcr.io/${{ github.repository }}
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          VERSION=${{ github.ref_name }}
+          echo "Building and pushing $IMAGE_ID:$VERSION and $IMAGE_ID:latest"
+          docker build . -t $IMAGE_ID:$VERSION -t $IMAGE_ID:latest
+          docker push $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:latest
+

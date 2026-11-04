@@ -14,6 +14,7 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
+#include <set>
 
 using namespace lynxfita;
 
@@ -27,6 +28,17 @@ class MockHardwareSensor : public lynxfita::generated::NativeHardwareSensorSpec 
     return true;
   }
 };
+
+// Real C++20 Coroutine generator producing numbers using <coroutine> and co_yield
+static CoroutineGenerator<int> FibonacciGenerator(int count) {
+  int a = 0, b = 1;
+  for (int i = 0; i < count; ++i) {
+    co_yield a;
+    int next = a + b;
+    a = b;
+    b = next;
+  }
+}
 
 void TestHermesRuntimeAdapter() {
   std::cout << "[RUN] TestHermesRuntimeAdapter..." << std::endl;
@@ -267,6 +279,7 @@ void TestDmaEibEngine() {
   std::cout << "[RUN] TestDmaEibEngine (Stationary Memory, SIMD Vector Packing, and DMA Lanes)..." << std::endl;
   auto engine = std::make_shared<DmaEibEngine>(1024 * 1024); // 1 MB arena
   assert(engine->GetStationaryBuffer().Capacity() == 1024 * 1024);
+  assert(engine->GetStationaryBuffer().IsCacheLineAligned());
 
   // 1. Pack SIMD 4-float vector into stationary buffer
   assert(engine->GetStationaryBuffer().PackSimdVector4f(0, 1.5f, 2.5f, 3.5f, 4.5f));
@@ -274,14 +287,23 @@ void TestDmaEibEngine() {
   assert(engine->GetStationaryBuffer().UnpackSimdVector4f(0, x, y, z, w));
   assert(x == 1.5f && y == 2.5f && z == 3.5f && w == 4.5f);
 
-  // 2. Setup bidirectional DMA channel
+  // 2. Real SIMD Vector Fused Multiply-Add (FMA) test: dst = a + b * scale
+  assert(engine->GetStationaryBuffer().PackSimdVector4f(64, 10.0f, 20.0f, 30.0f, 40.0f));
+  assert(engine->GetStationaryBuffer().PackSimdVector4f(128, 2.0f, 3.0f, 4.0f, 5.0f));
+  // 64 + 128 * 0.5 = [11.0, 21.5, 32.0, 42.5] stored at offset 192
+  assert(engine->GetStationaryBuffer().SimdVectorFmaAdd(64, 128, 192, 4, 0.5f));
+  float f0 = 0, f1 = 0, f2 = 0, f3 = 0;
+  assert(engine->GetStationaryBuffer().UnpackSimdVector4f(192, f0, f1, f2, f3));
+  assert(f0 == 11.0f && f1 == 21.5f && f2 == 32.0f && f3 == 42.5f);
+
+  // 3. Setup bidirectional DMA channel
   assert(engine->CreateChannel(1, DmaLaneDirection::Bidirectional));
   assert(!engine->CreateChannel(1, DmaLaneDirection::Bidirectional)); // Duplicate rejected
   auto ch = engine->GetChannel(1);
   assert(ch != nullptr);
   assert(ch->GetId() == 1);
 
-  // 3. Execute zero-copy DMA transfer from offset 0 to offset 256
+  // 4. Execute zero-copy DMA transfer across EIB concentric dual-rings
   DmaTransferRequest req;
   req.channel_id = 1;
   req.source_offset = 0;
@@ -292,15 +314,17 @@ void TestDmaEibEngine() {
   auto res = engine->ExecuteTransfer(req);
   assert(res.success);
   assert(res.bytes_transferred == 16);
+  assert(res.ring_hops >= 1);
   assert(engine->GetTotalTransfers() == 1);
   assert(engine->GetTotalBytesTransferred() == 16);
+  assert((engine->GetRing0Transfers() + engine->GetRing1Transfers()) == 1);
 
   // Verify memory arrived at destination offset 256
   float dx = 0, dy = 0, dz = 0, dw = 0;
   assert(engine->GetStationaryBuffer().UnpackSimdVector4f(256, dx, dy, dz, dw));
   assert(dx == 1.5f && dy == 2.5f && dz == 3.5f && dw == 4.5f);
 
-  // 4. Boundary overflow enforcement
+  // 5. Boundary overflow enforcement
   DmaTransferRequest overflow_req;
   overflow_req.channel_id = 1;
   overflow_req.source_offset = 0;
@@ -310,10 +334,11 @@ void TestDmaEibEngine() {
   assert(!err_res.success);
   assert(err_res.error_message.find("overflow") != std::string::npos);
 
-  // 5. Test StationaryDmaHostObject JSI wrapper
+  // 6. Test StationaryDmaHostObject JSI wrapper
   auto host_obj = std::make_shared<StationaryDmaHostObject>(engine);
   assert(std::holds_alternative<int64_t>(host_obj->GetProperty("capacity")));
   assert(std::get<int64_t>(host_obj->GetProperty("capacity")) == 1024 * 1024);
+  assert(std::get<bool>(host_obj->GetProperty("isCacheLineAligned")) == true);
 
   std::vector<JsiValueVariant> jsi_transfer_args = {
     static_cast<int64_t>(1),
@@ -330,10 +355,20 @@ void TestDmaEibEngine() {
 
 void TestCoroutineScheduler() {
   std::cout << "[RUN] TestCoroutineScheduler (Non-Colored Fiber Coroutines without GIL)..." << std::endl;
-  auto scheduler = std::make_shared<CoroutineScheduler>(2);
-  assert(scheduler->GetActiveWorkerCount() == 2);
 
-  // Register 3-step generator coroutine
+  // 1. Test real C++20 <coroutine> Generator
+  auto gen = FibonacciGenerator(5);
+  assert(gen.MoveNext()); assert(gen.GetCurrent() == 0);
+  assert(gen.MoveNext()); assert(gen.GetCurrent() == 1);
+  assert(gen.MoveNext()); assert(gen.GetCurrent() == 1);
+  assert(gen.MoveNext()); assert(gen.GetCurrent() == 2);
+  assert(gen.MoveNext()); assert(gen.GetCurrent() == 3);
+  assert(!gen.MoveNext());
+
+  // 2. Test FiberCoroutine & Scheduler
+  auto scheduler = std::make_shared<CoroutineScheduler>(4);
+  assert(scheduler->GetActiveWorkerCount() == 4);
+
   auto coro = std::make_shared<FiberCoroutine>("tensor_stream", 3, [](size_t step) -> CoroutineYieldResult {
     if (step == 0) return { CoroutineState::Suspended, std::string("chunk_alpha"), false, "" };
     if (step == 1) return { CoroutineState::Suspended, std::string("chunk_beta"), false, "" };
@@ -343,22 +378,35 @@ void TestCoroutineScheduler() {
   scheduler->RegisterCoroutine(coro);
   assert(scheduler->GetCoroutine("tensor_stream") != nullptr);
 
-  // Step 1
   auto s1 = scheduler->StepCoroutine("tensor_stream");
   assert(s1.state == CoroutineState::Suspended);
   assert(std::get<std::string>(s1.value) == "chunk_alpha");
   assert(!s1.is_done);
 
-  // Step 2
   auto s2 = scheduler->StepCoroutine("tensor_stream");
   assert(s2.state == CoroutineState::Suspended);
   assert(std::get<std::string>(s2.value) == "chunk_beta");
 
-  // Step 3 (completion)
   auto s3 = scheduler->StepCoroutine("tensor_stream");
   assert(s3.state == CoroutineState::Completed);
   assert(std::get<std::string>(s3.value) == "chunk_omega");
   assert(s3.is_done);
+
+  // 3. Test parallel task execution across worker threads without GIL
+  std::vector<std::pair<std::string, std::function<void()>>> parallel_tasks;
+  for (int i = 0; i < 4; ++i) {
+    parallel_tasks.push_back({"task_" + std::to_string(i), []() {
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }});
+  }
+  auto records = scheduler->DispatchParallelAll(parallel_tasks);
+  assert(records.size() == 4);
+  std::set<std::thread::id> executed_threads;
+  for (const auto& rec : records) {
+    assert(rec.success);
+    executed_threads.insert(rec.thread_id);
+  }
+  assert(executed_threads.size() > 1); // Proves real parallel worker execution!
 
   // Reset and run all to completion
   coro->Reset();
@@ -418,6 +466,9 @@ void TestProtobufBridge() {
 void TestHermesCompiler() {
   std::cout << "[RUN] TestHermesCompiler (Runtime AOT Bytecode Compilation & Hot Reload)..." << std::endl;
   auto compiler = std::make_shared<HermesRuntimeCompiler>();
+  auto adapter = std::make_shared<HermesRuntimeAdapter>();
+  assert(adapter->Initialize(false));
+  compiler->AttachRuntimeAdapter(adapter);
 
   // 1. Compile JavaScript source to Hermes Bytecode (.hbc)
   CompilationOptions opts;
@@ -425,15 +476,18 @@ void TestHermesCompiler() {
   opts.static_h_mode = true;
   opts.bytecode_version = 96;
 
-  auto res = compiler->CompileSource("const answer = 42; export default answer;", "bundle://app.js", opts);
+  auto res = compiler->CompileSource("export const answer = 42; export default answer;", "bundle://app.js", opts);
   assert(res.success);
   assert(!res.bytecode.empty());
-  assert(res.bytecode.size() >= 8);
+  assert(res.bytecode.size() >= 16);
+  assert(res.source_fnv_hash != 0);
+  assert(!res.symbols_table.empty());
 
   // 2. Validate magic bytes: 0x1F, 'H', 'B', 'C'
   assert(HermesRuntimeCompiler::ValidateBytecode(res.bytecode.data(), res.bytecode.size()));
+  assert(HermesRuntimeCompiler::ExtractSourceHash(res.bytecode.data(), res.bytecode.size()) == res.source_fnv_hash);
 
-  // 3. Hot reload bundle
+  // 3. Hot reload bundle connected to runtime adapter
   assert(compiler->HotReloadBundle("main_bundle", res.bytecode.data(), res.bytecode.size()));
   assert(compiler->GetLoadedBundleCount() == 1);
 
@@ -442,7 +496,7 @@ void TestHermesCompiler() {
   assert(std::holds_alternative<int64_t>(host_obj->GetProperty("loadedBundleCount")));
   assert(std::get<int64_t>(host_obj->GetProperty("loadedBundleCount")) == 1);
 
-  auto compile_res = host_obj->InvokeMethod("compile", { std::string("let count = 0; count++;") });
+  auto compile_res = host_obj->InvokeMethod("compile", { std::string("export const x = 1;") });
   assert(std::holds_alternative<std::string>(compile_res));
   assert(std::get<std::string>(compile_res).find("Compiled HBC") != std::string::npos);
 
@@ -470,4 +524,3 @@ int main() {
   std::cout << "=========================================================" << std::endl;
   return 0;
 }
-

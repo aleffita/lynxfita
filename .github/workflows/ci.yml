@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ts-validation:
     name: TypeScript & Package Checks
@@ -28,8 +32,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
 
-      - name: Build TypeScript Workspaces
-        run: pnpm -r run build
+      - name: Build TypeScript Packages
+        run: pnpm --filter "./packages/*" run build
+
+      - name: Build Example Packages
+        run: pnpm --filter "./examples/*" run build
 
       - name: Run Package Tests
         run: pnpm -r run test
@@ -47,11 +54,6 @@ jobs:
 
       - name: Setup MSVC Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Setup Ninja
-        uses: ashutoshvarma/setup-ninja@v1
-        with:
-          version: 1.11.1
 
       - name: Configure CMake
         run: cmake -B build/native -S src/native -G Ninja -DCMAKE_BUILD_TYPE=Release

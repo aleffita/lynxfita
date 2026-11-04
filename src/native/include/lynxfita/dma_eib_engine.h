@@ -22,6 +22,11 @@ enum class DmaLaneDirection {
   Bidirectional
 };
 
+enum class EibRing {
+  Ring0_CW,   // Clockwise Ring
+  Ring1_CCW   // Counter-Clockwise Ring
+};
+
 struct DmaTransferRequest {
   uint32_t channel_id;
   uint64_t source_offset;
@@ -35,9 +40,11 @@ struct DmaTransferResult {
   uint32_t bytes_transferred;
   uint64_t transfer_time_ns;
   std::string error_message;
+  EibRing ring_used{EibRing::Ring0_CW};
+  uint32_t ring_hops{0};
 };
 
-// Pinned Stationary Buffer that never moves in physical/virtual memory
+// Pinned Stationary Buffer that never moves in physical/virtual memory (64-byte aligned & locked)
 class StationaryBuffer {
  public:
   explicit StationaryBuffer(size_t capacity_bytes);
@@ -55,13 +62,20 @@ class StationaryBuffer {
   const uint8_t* Data() const { return data_; }
   size_t Capacity() const { return capacity_; }
 
+  bool IsCacheLineAligned() const;
+  bool IsPageLocked() const;
+
   // SIMD 128-bit / 256-bit Vector packing helpers
   bool PackSimdVector4f(size_t offset, float x, float y, float z, float w);
   bool UnpackSimdVector4f(size_t offset, float& x, float& y, float& z, float& w) const;
 
+  // SIMD Fused Multiply-Add vector operation across buffer chunks
+  bool SimdVectorFmaAdd(size_t src_a_offset, size_t src_b_offset, size_t dst_offset, size_t float_count, float scale);
+
  private:
   uint8_t* data_;
   size_t capacity_;
+  bool is_page_locked_{false};
 };
 
 // Bidirectional DMA Channel (EIB Lane)
@@ -109,6 +123,10 @@ class DmaEibEngine {
   // Statistics
   uint64_t GetTotalTransfers() const { return total_transfers_.load(); }
   uint64_t GetTotalBytesTransferred() const { return total_bytes_transferred_.load(); }
+  uint64_t GetRing0Transfers() const { return ring0_transfers_.load(); }
+  uint64_t GetRing1Transfers() const { return ring1_transfers_.load(); }
+  uint64_t GetRing0Bytes() const { return ring0_bytes_.load(); }
+  uint64_t GetRing1Bytes() const { return ring1_bytes_.load(); }
 
  private:
   std::unique_ptr<StationaryBuffer> stationary_buffer_;
@@ -116,6 +134,10 @@ class DmaEibEngine {
   mutable std::mutex channels_mutex_;
   std::atomic<uint64_t> total_transfers_{0};
   std::atomic<uint64_t> total_bytes_transferred_{0};
+  std::atomic<uint64_t> ring0_transfers_{0};
+  std::atomic<uint64_t> ring1_transfers_{0};
+  std::atomic<uint64_t> ring0_bytes_{0};
+  std::atomic<uint64_t> ring1_bytes_{0};
 };
 
 // JSI HostObject for exposing Stationary DMA to JavaScript / Hermes

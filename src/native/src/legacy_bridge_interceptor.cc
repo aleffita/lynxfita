@@ -1,5 +1,7 @@
 #include "lynxfita/legacy_bridge_interceptor.h"
 #include "lynxfita/protobuf_bridge.h"
+#include <mutex>
+#include <shared_mutex>
 #include <stdexcept>
 #include <chrono>
 
