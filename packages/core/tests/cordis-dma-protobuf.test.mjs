@@ -99,6 +99,15 @@ test('StationaryDmaClient - SIMD Packing and Transfer', () => {
   assert.throws(() => {
     dma.transfer(1, 0, (64 * 1024) - 4, 16);
   }, /overflow/);
+
+  // Negative offset checks
+  assert.throws(() => {
+    dma.transfer(1, -10, 0, 16);
+  }, /overflow/);
+  assert.equal(dma.packSimd4f(-1, 1, 2, 3, 4), false);
+  assert.throws(() => {
+    dma.unpackSimd4f(-1);
+  }, /overflow/);
 });
 
 test('CoroutineRunner - Non-Colored Generator Steps', () => {
