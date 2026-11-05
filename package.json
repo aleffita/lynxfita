@@ -14,7 +14,7 @@
   "packageManager": "pnpm@12.5.1",
   "scripts": {
     "postinstall": "node --experimental-strip-types scripts/setup-workspace.ts",
-    "build": "node --experimental-strip-types scripts/setup-workspace.ts && pnpm -r run build",
+    "build": "node --experimental-strip-types scripts/build-workspace.ts",
     "explore": "node --experimental-strip-types examples/explorer/src/host/server.ts",
     "dev": "node --experimental-strip-types examples/explorer/src/host/server.ts",
     "bench": "node --experimental-strip-types benchmarks/run_benchmarks.ts",

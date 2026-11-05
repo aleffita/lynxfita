@@ -4,7 +4,7 @@ Methodology: Kalibera & Jones standard ($N = 30$ independent samples per regime,
 
 ## Provenance
 
-- **Timestamp**: `2026-11-05T13:15:08.600Z`
+- **Timestamp**: `2026-11-05T15:26:52.198Z`
 - **Processor**: `AMD Ryzen 5 4500 6-Core Processor` (12 cores)
 - **Operating System**: `Windows_NT 10.0.19045 (win32)` [x64]
 - **Node.js**: `v26.12.1`
@@ -13,20 +13,20 @@ Methodology: Kalibera & Jones standard ($N = 30$ independent samples per regime,
 
 | Subsystem / Benchmark | Payload | $p50$ (\mu s) | IQR (\mu s) | $p95$ (\mu s) | $p99$ (\mu s) | Mean \pm 95\% CI (\mu s) | CV% | Throughput (MB/s) | \Delta Heap (KiB) |
 |---|---|---|---|---|---|---|---|---|---|
-| **Stationary DMA Transfer** | `64 B` | 0.6 | 0 | 1.2 | 2.2 | 0.7 \pm 0.1 | 45.09% | 88.46 | 350.65 |
-| **Stationary DMA Transfer** | `4 KB` | 0.6 | 0 | 1 | 1.1 | 0.6 \pm 0.0 | 18.67% | 6135.47 | -415.81 |
-| **Stationary DMA Transfer** | `64 KB` | 1.6 | 0 | 1.8 | 2 | 1.6 \pm 0.0 | 6.01% | 38981.29 | 16.2 |
-| **Stationary DMA Transfer** | `1 MB` | 23.1 | 0.2 | 27.4 | 30.7 | 23.5 \pm 0.6 | 6.67% | 42498.94 | 16.15 |
-| **SIMD 4-Float Pack/Unpack** | `16 B` | 0.36 | 0.07 | 0.79 | 0.82 | 0.4 \pm 0.1 | 41.09% | 38.22 | -407.38 |
-| **Protobuf MethodCall Wire** | `64 B` | 7.7 | 2.9 | 16.6 | 17.2 | 9.0 \pm 0.9 | 28.23% | 6.8 | 55.83 |
-| **Protobuf MethodCall Wire** | `4 KB` | 9.6 | 5 | 23.7 | 35.3 | 12.2 \pm 2.1 | 47.67% | 319.57 | 287.51 |
-| **WASI Linear Memory Interop** | `64 B` | 0.5 | 0.1 | 1.1 | 1.3 | 0.5 \pm 0.1 | 38.92% | 117.38 | 76.52 |
-| **WASI Linear Memory Interop** | `4 KB` | 1.2 | 0.4 | 2.8 | 35.2 | 2.5 \pm 2.2 | 252.99% | 1594.39 | 12.75 |
-| **WASI Linear Memory Interop** | `64 KB` | 21.4 | 3.6 | 31.6 | 32.6 | 21.9 \pm 1.4 | 17.74% | 2851.28 | 12.75 |
-| **WASI Linear Memory Interop** | `1 MB` | 285.2 | 85.9 | 472.8 | 631.5 | 306.0 \pm 33.6 | 30.68% | 3268.29 | 12.75 |
-| **WebGPU Atmospheric Compute** | `64 B` | 2.9 | 0.2 | 3.6 | 12.2 | 3.2 \pm 0.6 | 52.87% | 18.92 | 92.23 |
-| **WebGPU Atmospheric Compute** | `4 KB` | 19.9 | 8.4 | 99.4 | 101.2 | 32.1 \pm 9.8 | 85.68% | 121.66 | 612.54 |
-| **Hermes HBC Bytecode Compiler** | `53 B` | 1.2 | 0.2 | 2.5 | 4.8 | 1.4 \pm 0.3 | 50.4% | 36.19 | 24.59 |
+| **Stationary DMA Transfer** | `64 B` | 0.9 | 0.1 | 1.9 | 9.3 | 1.2 \pm 0.6 | 130.56% | 51.43 | 25.71 |
+| **Stationary DMA Transfer** | `4 KB` | 0.7 | 0.1 | 1.7 | 2.8 | 0.9 \pm 0.2 | 50.52% | 4489.94 | -328.48 |
+| **Stationary DMA Transfer** | `64 KB` | 2.2 | 0.3 | 2.9 | 3.2 | 2.2 \pm 0.1 | 13.79% | 28026.91 | 16.2 |
+| **Stationary DMA Transfer** | `1 MB` | 29.8 | 15.6 | 113 | 167.1 | 41.6 \pm 10.7 | 72.05% | 24017.29 | 16.15 |
+| **SIMD 4-Float Pack/Unpack** | `16 B` | 0.54 | 0.18 | 2.1 | 23.81 | 1.4 \pm 1.5 | 303.81% | 10.91 | -317.41 |
+| **Protobuf MethodCall Wire** | `64 B` | 10.7 | 1.4 | 15.6 | 16.3 | 11.2 \pm 0.6 | 15.59% | 5.46 | 166.06 |
+| **Protobuf MethodCall Wire** | `4 KB` | 15.5 | 4.5 | 53.9 | 57.1 | 19.5 \pm 4.2 | 60.11% | 200.12 | 284.05 |
+| **WASI Linear Memory Interop** | `64 B` | 0.6 | 0 | 0.9 | 2.3 | 0.7 \pm 0.1 | 47.71% | 91.1 | 37.06 |
+| **WASI Linear Memory Interop** | `4 KB` | 2.1 | 0.7 | 2.8 | 48.1 | 3.6 \pm 3.0 | 234.4% | 1088.09 | 12.75 |
+| **WASI Linear Memory Interop** | `64 KB` | 31 | 6.2 | 55.2 | 57.4 | 33.1 \pm 2.8 | 23.83% | 1886.51 | 12.75 |
+| **WASI Linear Memory Interop** | `1 MB` | 755.5 | 151 | 962.1 | 980.4 | 754.7 \pm 38.8 | 14.38% | 1324.99 | 12.75 |
+| **WebGPU Atmospheric Compute** | `64 B` | 5.9 | 1.3 | 8.5 | 64.1 | 7.8 \pm 3.8 | 137.44% | 7.86 | 92.23 |
+| **WebGPU Atmospheric Compute** | `4 KB` | 37.5 | 4.6 | 41.9 | 53.9 | 37.8 \pm 1.4 | 10.47% | 103.4 | 22.13 |
+| **Hermes HBC Bytecode Compiler** | `53 B` | 1.7 | 0.4 | 5.2 | 15.2 | 2.5 \pm 0.9 | 102.99% | 20.11 | 24.58 |
 
 ## Interpretation & Invariants
 

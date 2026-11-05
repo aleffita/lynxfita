@@ -36,7 +36,7 @@ test('Weather Showcase Real Browser E2E: 5 MVI Screens, Tokyo Selection, DMA Tel
 
     // Save dark mode screenshot
     const darkShotPath = resolve(assetsDir, 'weather-showcase-dark.png');
-    await page.screenshot({ path: darkShotPath, fullPage: false });
+    await page.screenshot({ path: darkShotPath, fullPage: false, animations: 'disabled' });
     assert.ok(existsSync(darkShotPath), 'weather-showcase-dark.png must be saved');
 
     // 3. Screen 2: Hourly Detail
@@ -73,7 +73,7 @@ test('Weather Showcase Real Browser E2E: 5 MVI Screens, Tokyo Selection, DMA Tel
 
     // Save light mode screenshot
     const lightShotPath = resolve(assetsDir, 'weather-showcase-light.png');
-    await page.screenshot({ path: lightShotPath, fullPage: false });
+    await page.screenshot({ path: lightShotPath, fullPage: false, animations: 'disabled' });
     assert.ok(existsSync(lightShotPath), 'weather-showcase-light.png must be saved');
 
     // 6. Screen 4: Shader DMA & GPU Inspector

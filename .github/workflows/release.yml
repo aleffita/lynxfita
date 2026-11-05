@@ -65,7 +65,7 @@ jobs:
         run: node --experimental-strip-types scripts/setup-workspace.ts
 
       - name: Build All Monorepo Packages
-        run: pnpm -r run build
+        run: pnpm run build
 
       - name: Install Playwright Chromium & FFmpeg for E2E Browser Tests
         run: pnpm exec playwright-core install chromium ffmpeg
