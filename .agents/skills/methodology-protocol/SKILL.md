@@ -23,7 +23,8 @@ Use when:
 2. **Decoupage & Extraction**: Extract technical requirements, domain constraints, negative invariants (what NOT to do), and conceptual paradigms.
 3. **Ontological & Glossary Sync**: Update `docs/glossary.md` and `AGENTS.md` with newly introduced terms and models.
 4. **Subagent Specialization**: Assign specialized roles (Runtime Specialist, Desktop Architect, Protocol Governor, Docs Curator) without overlapping scopes.
-5. **Atomic Execution**: Execute single atomic steps sequentially ("passando o bastão"), verifying each intermediate milestone with real tests.
+5. **Atomic Execution & Material Verification**: Execute single atomic steps sequentially, passing the baton step-by-step and verifying each intermediate milestone with real physical tests.
+6. **Pre-Commit Empirical Reality Check**: Verify that every documented feature or benchmark corresponds to real, executable native code. Strictly prohibit toy stubs, simulated VMs, or synthetic mock metrics.
 
 ## Subagent Orchestration Matrix
 - **Lead Coordinator**: Maintains global strategic alignment, monitors CI/CD regressions, and communicates directly with the principal.
