@@ -1,32 +1,30 @@
 ---
-type: protocol
-title: Desktop Architect Subagent Specification
-description: Operational profile and domain boundaries for Windows NT native desktop, Lynxtron GN/Chromium shell, and Win32 embedder.
+type: profile
+title: "Desktop & Super-App Architect — Multi-Platform LynxFita Explorer, WebGPU/WGSL & HMR Dev Server"
+description: "Operational profile for the multi-platform LynxFita Explorer modeled on vendor/lynx/explorer, MVI application showcases, WebGPU compute pipelines, and browser/FFmpeg media capture."
 tags:
-  - subagent
-  - desktop
-  - windows
-  - lynxtron
-  - electron
-  - ipc
-timestamp: 2026-11-04
+  - desktop-architect
+  - explorer
+  - super-app
+  - webgpu
+  - hmr
+timestamp: 2026-11-05
 status: active
+author: aleffita
 ---
 
-# Desktop Architect Subagent Profile
+# Desktop & Super-App Architect Profile
 
-## Domain of Governance
-- Windows NT desktop platform architecture and Win32 / WinRT boundaries.
-- Lynxtron desktop shell (`vendor/lynxtron`) based on Chromium GN build, `gin` (V8), and Node.js.
-- Lynx desktop explorer and direct Node-API dynamic loader (`vendor/lynx/explorer/windows/`).
-- Inter-Process Communication (IPC) replacement and zero-copy shared memory channels.
-- Desktop packaging, avoiding heavyweight electron-builder / electron-updater dependencies in favor of dynamic AOT updates.
+## Scope & Ownership
+Owns [`examples/explorer/`](file:///j:/limiar/packages/lynxfita/examples/explorer), [`examples/weather-showcase/`](file:///j:/limiar/packages/lynxfita/examples/weather-showcase), [`packages/builder/`](file:///j:/limiar/packages/lynxfita/packages/builder), and [`packages/cli/`](file:///j:/limiar/packages/lynxfita/packages/cli).
 
-## Invariants & Principles
-1. **Windows NT AppContainer Hygiene**: Respect ACLs and token capability isolation. Never deploy coarse system-wide hacks.
-2. **Desktop Dichotomy Resolution**: Maintain clarity between Lynx native desktop (embedder via Win32) and Lynxtron (Chromium content shell + embedded runtime).
-3. **Zero Blocking GUI Invocations**: Never invoke interactive desktop processes with `-Wait`.
-
-## Verification Checkpoints
-- Inspect process lifecycles and ensure single-instance mutex cleanliness.
-- Verify Lynxtron extra build args in `src/lynxtron_extra.gni`.
+## Core Engineering Mandates
+1. **Multi-Platform Explorer Modeled on `vendor/lynx/explorer`**:
+   - Never expose Windows-only `.exe` paths as primary developer workflows in documentation.
+   - Structure `examples/explorer/` with `homepage/`, `showcase/` (hosting `weather-showcase` and `wit-wasi-ffi`), live Cordis Fiber tree inspector, DMA telemetry monitor, and interactive mTLS Certificate / Module Federation controls.
+   - Provide `pnpm explore` / `pnpm dev` with built-in Hot Module Replacement (HMR) and local dev server (`http://127.0.0.1:4173`).
+2. **Real Browser Execution & FFmpeg Media Capture (`record-browser-gif`)**:
+   - Never use synthetic AI-slop SVG banners.
+   - Boot the live Explorer dev server, drive real interactions in headless Chromium/Chrome, and encode `.mp4` and `.gif` demonstrations with FFmpeg.
+3. **W3C WebGPU Staging & `huggingface/kernels`**:
+   - Enforce two-buffer W3C WebGPU readback (`STORAGE | COPY_SRC` compute buffer $\rightarrow$ `copyBufferToBuffer` $\rightarrow$ `MAP_READ | COPY_DST` staging buffer) and bind WGSL compute uniforms directly to Stationary DMA slots.

@@ -51,6 +51,30 @@ export class WeatherStore {
 
   public async dispatch(intent: WeatherIntent): Promise<WeatherState> {
     switch (intent.type) {
+      case 'SWITCH_SCREEN': {
+        this.updateState({
+          ...this.state,
+          activeScreen: intent.payload.screen
+        });
+        break;
+      }
+
+      case 'SELECT_CITY': {
+        const { city, country, lat, lon } = intent.payload;
+        const fetchResult = await this.apiService.fetchWeather(lat, lon, city, country);
+        this.updateState({
+          ...this.state,
+          activeScreen: 'forecast-home',
+          location: fetchResult.location,
+          current: fetchResult.current,
+          hourly: fetchResult.hourly,
+          isOfflineFallback: fetchResult.isOfflineFallback,
+          lastSyncTimestamp: Date.now(),
+          error: { hasError: false }
+        });
+        break;
+      }
+
       case 'TOGGLE_THEME': {
         const nextTheme = this.state.theme === 'dark' ? 'light' : 'dark';
         this.updateState({
@@ -114,6 +138,7 @@ export class WeatherStore {
 
         this.updateState({
           ...this.state,
+          activeScreen: 'forecast-home',
           error: { hasError: false },
           location: fetchResult.location,
           current: fetchResult.current,

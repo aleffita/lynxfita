@@ -54,3 +54,5 @@ pnpm-debug.log*
 .turbo/
 .cache/
 tmp/
+.scratch/
+test-results/

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(lynxfita_native VERSION 0.1.0 LANGUAGES CXX)
+project(lynxfita_native VERSION 2.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,8 +12,19 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+# Dynamically loaded Weather SIMD Shared Library Plugin
+add_library(lynxfita_weather_simd_plugin SHARED
+    plugins/weather_simd_plugin.cc
+)
+
+target_include_directories(lynxfita_weather_simd_plugin PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+
 # LynxFita Native Core Library
 add_library(lynxfita_native STATIC
+    src/cordis_native_context.cc
+    src/native_ffi_loader.cc
     src/hermes_runtime_adapter.cc
     src/legacy_bridge_interceptor.cc
     src/wasi_host_module.cc
@@ -32,6 +43,10 @@ target_link_libraries(lynxfita_native PUBLIC
     Threads::Threads
 )
 
+if(CMAKE_DL_LIBS)
+    target_link_libraries(lynxfita_native PUBLIC ${CMAKE_DL_LIBS})
+endif()
+
 # LynxFita Native Test Runner Executable
 enable_testing()
 
@@ -43,6 +58,8 @@ target_link_libraries(lynxfita_native_tests PRIVATE
     lynxfita_native
     Threads::Threads
 )
+
+add_dependencies(lynxfita_native_tests lynxfita_weather_simd_plugin)
 
 add_test(NAME LynxFitaNativeTests COMMAND lynxfita_native_tests)
 
@@ -56,3 +73,8 @@ target_link_libraries(lynxfita_explorer PRIVATE
     Threads::Threads
 )
 
+if(WIN32)
+    target_link_libraries(lynxfita_explorer PRIVATE user32 gdi32)
+endif()
+
+add_dependencies(lynxfita_explorer lynxfita_weather_simd_plugin)

@@ -1,7 +1,9 @@
 /**
- * Cell Broadband Engine (CBE) Element Interconnect Bus (EIB) DMA Client
+ * Cell Broadband Engine (CBE) Element Interconnect Bus (EIB) DMA Client & Cordis Service
  * Manages zero-copy stationary memory buffers and parallel DMA lane transfers.
  */
+
+import { Service, type LynxFitaContext } from './cordis.js';
 
 declare global {
   var __lynxfita_stationary_dma: any;
@@ -24,12 +26,15 @@ export class StationaryDmaClient {
     this.buffer = new Uint8Array(arenaSizeBytes);
   }
 
+  public getRawBuffer(): Uint8Array {
+    return this.buffer;
+  }
+
   public transfer(channelId: number, sourceOffset: number, destinationOffset: number, byteCount: number): string {
     if (typeof globalThis.__lynxfita_stationary_dma !== 'undefined') {
       return globalThis.__lynxfita_stationary_dma.transfer(channelId, sourceOffset, destinationOffset, byteCount);
     }
 
-    // High-performance typed array in-memory DMA lane simulation
     if (sourceOffset < 0 || destinationOffset < 0 || byteCount < 0 ||
         sourceOffset + byteCount > this.capacity || destinationOffset + byteCount > this.capacity) {
       throw new Error('DMA bounds overflow: transfer exceeds stationary buffer capacity');
@@ -84,5 +89,41 @@ export class StationaryDmaClient {
       totalTransfers: this.transfersCount,
       totalBytesTransferred: this.bytesCount
     };
+  }
+}
+
+export class DmaService extends Service {
+  public static provide = 'dma';
+  public static inject = [];
+
+  private client: StationaryDmaClient;
+
+  constructor(ctx: LynxFitaContext, arenaSize = 1024 * 1024) {
+    super(ctx, 'dma');
+    this.client = new StationaryDmaClient(arenaSize);
+  }
+
+  public getRawBuffer(): Uint8Array {
+    return this.client.getRawBuffer();
+  }
+
+  public getSlot(offset: number, size: number): Uint8Array {
+    return this.client.getRawBuffer().subarray(offset, offset + size);
+  }
+
+  public transfer(channelId: number, src: number, dst: number, count: number): string {
+    return this.client.transfer(channelId, src, dst, count);
+  }
+
+  public packSimd4f(offset: number, x: number, y: number, z: number, w: number): boolean {
+    return this.client.packSimd4f(offset, x, y, z, w);
+  }
+
+  public unpackSimd4f(offset: number): [number, number, number, number] {
+    return this.client.unpackSimd4f(offset);
+  }
+
+  public getStats(): DmaStats {
+    return this.client.getStats();
   }
 }

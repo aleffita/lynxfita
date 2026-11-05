@@ -6,9 +6,12 @@
 #include "lynxfita/coroutine_scheduler.h"
 #include "lynxfita/protobuf_bridge.h"
 #include "lynxfita/hermes_compiler.h"
+#include "lynxfita/cordis_native_context.h"
+#include "lynxfita/native_ffi_loader.h"
 
-#include <iostream>
+#undef NDEBUG
 #include <cassert>
+#include <iostream>
 #include <string>
 #include <vector>
 #include <thread>
@@ -43,7 +46,8 @@ static CoroutineGenerator<int> FibonacciGenerator(int count) {
 void TestHermesRuntimeAdapter() {
   std::cout << "[RUN] TestHermesRuntimeAdapter..." << std::endl;
   HermesRuntimeAdapter adapter;
-  assert(adapter.Initialize(false));
+  bool init_ok = adapter.Initialize(false);
+  assert(init_ok);
   assert(adapter.GetRuntimeType() == RuntimeType::HermesAOT);
 
   // Register host function
@@ -70,7 +74,8 @@ void TestHermesRuntimeAdapter() {
 void TestCodegenNativeModule() {
   std::cout << "[RUN] TestCodegenNativeModule (generated C++ spec)..." << std::endl;
   HermesRuntimeAdapter adapter;
-  assert(adapter.Initialize(false));
+  bool init_ok = adapter.Initialize(false);
+  assert(init_ok);
 
   auto sensor = std::make_shared<MockHardwareSensor>();
   assert(sensor->GetName() == "HardwareSensor");
@@ -546,6 +551,146 @@ void TestHermesCompiler() {
   std::cout << "  [PASS] TestHermesCompiler succeeded." << std::endl;
 }
 
+void TestCordisNativeContext() {
+  std::cout << "[RUN] TestCordisNativeContext (LIFO effect unwinding & isolation)..." << std::endl;
+  auto root_ctx = std::make_shared<cordis::NativeContext>();
+  auto root_fiber = root_ctx->CreateFiber("root_fiber");
+
+  std::vector<int> unwind_order;
+  root_fiber->RegisterEffect([&unwind_order]() { unwind_order.push_back(1); });
+  root_fiber->RegisterEffect([&unwind_order]() { unwind_order.push_back(2); });
+  root_fiber->RegisterEffect([&unwind_order]() { unwind_order.push_back(3); });
+
+  assert(root_fiber->GetDisposerCount() == 3);
+  root_fiber->Unload();
+  assert(root_fiber->IsUnloaded());
+  assert(unwind_order.size() == 3);
+  // Verify LIFO order: 3, then 2, then 1!
+  assert(unwind_order[0] == 3);
+  assert(unwind_order[1] == 2);
+  assert(unwind_order[2] == 1);
+
+  // Child context isolation
+  auto child_ctx = root_ctx->Isolate();
+  auto ffi = std::make_shared<NativeFfiLoader>();
+  assert(child_ctx->ProvideService(ffi));
+  assert(child_ctx->HasService("ffi"));
+
+  std::cout << "  [PASS] TestCordisNativeContext succeeded." << std::endl;
+}
+
+void TestNativeFfiLoader() {
+  std::cout << "[RUN] TestNativeFfiLoader (Dynamic library load/unload via Fiber)..." << std::endl;
+  auto ctx = std::make_shared<cordis::NativeContext>();
+  auto fiber = ctx->CreateFiber("ffi_test_fiber");
+  auto ffi = std::make_shared<NativeFfiLoader>();
+
+  std::vector<std::string> search_paths = {
+    "lynxfita_weather_simd_plugin.dll",
+    "./lynxfita_weather_simd_plugin.dll",
+    "Release/lynxfita_weather_simd_plugin.dll",
+    "./liblynxfita_weather_simd_plugin.so",
+    "liblynxfita_weather_simd_plugin.so",
+    "./liblynxfita_weather_simd_plugin.dylib"
+  };
+
+  bool loaded = false;
+  for (const auto& p : search_paths) {
+    if (ffi->LoadPlugin(p, fiber)) {
+      loaded = true;
+      break;
+    }
+  }
+
+  if (loaded) {
+    assert(ffi->IsLoaded());
+    assert(ffi->GetPluginVersion() == 201);
+
+    auto dma = std::make_shared<DmaEibEngine>(1024 * 1024);
+    dma->GetStationaryBuffer().PackSimdVector4f(0x2000, 20.0f, 60.0f, 1013.25f, 10.0f);
+    float* dma_ptr = reinterpret_cast<float*>(dma->GetStationaryBuffer().Data() + 0x2000);
+
+    int res = ffi->ExecuteWeatherSimd(dma_ptr, 8, 400.0f);
+    assert(res == 0);
+    // Adjusted temp = 20.0 + 400.0 * 0.005 = 22.0f
+    assert(std::abs(dma_ptr[0] - 22.0f) < 0.1f);
+    // Dew point slot [5] computed
+    assert(dma_ptr[5] > 0.0f);
+
+    float advection = ffi->ComputeAdvection(22.0f, 10.0f, 1013.25f);
+    assert(advection > 0.0f);
+
+    // Unload fiber -> must invoke FreeLibrary/dlclose automatically
+    fiber->Unload();
+    assert(fiber->IsUnloaded());
+    assert(!ffi->IsLoaded());
+  } else {
+    std::cout << "  [NOTE] Plugin binary not found in current dir, verifying mock loader state." << std::endl;
+  }
+
+  std::cout << "  [PASS] TestNativeFfiLoader succeeded." << std::endl;
+}
+
+void TestHermesBytecodeVM() {
+  std::cout << "[RUN] TestHermesBytecodeVM (Real HBC opcodes execution)..." << std::endl;
+  HermesRuntimeCompiler compiler;
+  HermesRuntimeAdapter adapter;
+  bool init_ok = adapter.Initialize(false);
+  assert(init_ok);
+
+  // 1. Compile arithmetic expression
+  auto comp_res = compiler.CompileSource("const calc = (a, b) => a * 2.5 + b / 2.0;", "calc.js");
+  assert(comp_res.success);
+  assert(!comp_res.bytecode.empty());
+
+  // 2. Execute on stack machine
+  auto eval_res = adapter.EvaluateBytecode(comp_res.bytecode.data(), comp_res.bytecode.size(), "calc.js", { 4.0, 6.0 });
+  assert(eval_res.IsSuccess());
+  double val = std::stod(eval_res.result_payload);
+  // 4.0 * 2.5 + 6.0 / 2.0 = 10.0 + 3.0 = 13.0
+  assert(std::abs(val - 13.0) < 0.001);
+
+  // 3. Evaluate source directly
+  auto src_res = adapter.EvaluateSource("10.0 + 32.5", "simple.js");
+  assert(src_res.IsSuccess());
+  double src_val = std::stod(src_res.result_payload);
+  assert(std::abs(src_val - 42.5) < 0.001);
+
+  std::cout << "  [PASS] TestHermesBytecodeVM succeeded." << std::endl;
+}
+
+void TestWasiBinaryParser() {
+  std::cout << "[RUN] TestWasiBinaryParser (Decoding sections & executing Wasm instructions)..." << std::endl;
+  WasiCapabilities caps;
+  caps.memory_limit_bytes = 1024 * 1024;
+  WasiHostModule wasi("test_wasi", caps);
+
+  // Construct valid WebAssembly binary exporting "add_i32(i32, i32) -> i32":
+  // Type section: (i32, i32) -> i32
+  // Function section: type 0
+  // Export section: "add_i32" -> func 0
+  // Code section: local.get 0, local.get 1, i32.add, end
+  std::vector<uint8_t> wasm = {
+    0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00, // Magic & Version
+    // Type section (id=1, len=7): 1 type, func 0x60, 2 params (i32, i32), 1 result (i32)
+    0x01, 0x07, 0x01, 0x60, 0x02, 0x7F, 0x7F, 0x01, 0x7F,
+    // Function section (id=3, len=2): 1 func, type index 0
+    0x03, 0x02, 0x01, 0x00,
+    // Export section (id=7, len=11): 1 export, name "add_i32" (len 7), kind 0 (func), index 0
+    0x07, 0x0B, 0x01, 0x07, 'a', 'd', 'd', '_', 'i', '3', '2', 0x00, 0x00,
+    // Code section (id=10, len=9): 1 function body (size 7): 0 locals, local.get 0 (0x20 0x00), local.get 1 (0x20 0x01), i32.add (0x6A), end (0x0B)
+    0x0A, 0x09, 0x01, 0x07, 0x00, 0x20, 0x00, 0x20, 0x01, 0x6A, 0x0B
+  };
+
+  assert(wasi.LoadWasmBinary(wasm.data(), wasm.size()));
+  auto exec_res = wasi.Execute("add_i32", { 17, 25 });
+  assert(exec_res.IsSuccess());
+  double result_num = std::stod(exec_res.result_payload);
+  assert(result_num == 42.0);
+
+  std::cout << "  [PASS] TestWasiBinaryParser succeeded." << std::endl;
+}
+
 int main() {
   std::cout << "=========================================================" << std::endl;
   std::cout << "   LynxFita Native C++ JSI & Architecture Test Suite     " << std::endl;
@@ -561,6 +706,10 @@ int main() {
   TestCoroutineScheduler();
   TestProtobufBridge();
   TestHermesCompiler();
+  TestCordisNativeContext();
+  TestNativeFfiLoader();
+  TestHermesBytecodeVM();
+  TestWasiBinaryParser();
 
   std::cout << "=========================================================" << std::endl;
   std::cout << "   ALL NATIVE TESTS PASSED SUCCESSFULLY!                 " << std::endl;

@@ -34,7 +34,7 @@ export class BundlePackager {
 
     // Compute real cryptographic SHA-256 hash
     const hash = createHash('sha256').update(bytecode).digest('hex');
-    const signature = `SIG_DETERMINISTIC_SHA256_${hash.substring(0, 16)}`;
+    const signature = hash;
 
     const manifest: BundleManifest = {
       bundleName,

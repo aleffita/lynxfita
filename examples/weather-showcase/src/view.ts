@@ -196,7 +196,229 @@ export function renderWeatherAppView(state: WeatherState): LynxVirtualNode {
   };
 }
 
-// 7. Rich ANSI Console Renderer
+// 8. Interactive HTML / Canvas / DOM Multi-Screen Renderer
+export function renderHtmlWeatherApp(state: WeatherState): string {
+  const theme = getTheme(state.theme);
+  const icon = resolveWeatherIcon(state.current.iconCode);
+  const isDark = state.theme === 'dark';
+  const cardBg = isDark ? '#222232' : '#ffffff';
+  const borderCol = isDark ? '#333344' : '#e0e0e0';
+  const textMuted = isDark ? '#a0a0b0' : '#666666';
+
+  const screen = state.activeScreen || 'forecast-home';
+
+  let screenContent = '';
+
+  if (screen === 'location-error-boundary' || state.error.hasError) {
+    screenContent = `
+      <div class="screen-error" style="padding: 30px; text-align: center;">
+        <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+        <h3 style="color: #ff6b6b; margin-bottom: 8px;">Erro de Localização</h3>
+        <p style="color: ${textMuted}; margin-bottom: 24px;">${state.error.message || 'Por favor, permita o acesso à localização.'}</p>
+        <button onclick="dispatchWeatherIntent({ type: 'GRANT_LOCATION_PERMISSION' })"
+                style="background: #f9d65d; color: #1a1a24; font-weight: bold; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer;">
+          Conceder Permissão
+        </button>
+      </div>
+    `;
+  } else if (screen === 'hourly-detail') {
+    screenContent = `
+      <div class="screen-hourly" style="padding: 20px;">
+        <h3 style="margin-top: 0; color: #f9d65d;">Detalhamento Horário (24h)</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;">
+          <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px; text-align: center;">
+            <div style="color: ${textMuted}; font-size: 13px;">+3 HORAS</div>
+            <div style="font-size: 28px; margin: 8px 0;">${resolveWeatherIcon(state.hourly['3h'].icon).unicodeGlyph}</div>
+            <div style="font-size: 22px; font-weight: bold;">${state.hourly['3h'].temp.toFixed(1)}°C</div>
+            <div style="font-size: 12px; color: ${textMuted};">${state.hourly['3h'].condition}</div>
+          </div>
+          <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px; text-align: center;">
+            <div style="color: ${textMuted}; font-size: 13px;">+6 HORAS</div>
+            <div style="font-size: 28px; margin: 8px 0;">${resolveWeatherIcon(state.hourly['6h'].icon).unicodeGlyph}</div>
+            <div style="font-size: 22px; font-weight: bold;">${state.hourly['6h'].temp.toFixed(1)}°C</div>
+            <div style="font-size: 12px; color: ${textMuted};">${state.hourly['6h'].condition}</div>
+          </div>
+          <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px; text-align: center;">
+            <div style="color: ${textMuted}; font-size: 13px;">+12 HORAS</div>
+            <div style="font-size: 28px; margin: 8px 0;">${resolveWeatherIcon(state.hourly['12h'].icon).unicodeGlyph}</div>
+            <div style="font-size: 22px; font-weight: bold;">${state.hourly['12h'].temp.toFixed(1)}°C</div>
+            <div style="font-size: 12px; color: ${textMuted};">${state.hourly['12h'].condition}</div>
+          </div>
+        </div>
+        <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px;">
+          <h4 style="margin: 0 0 12px 0; font-size: 14px; color: ${textMuted};">CURVA DE TEMPERATURA</h4>
+          <div style="display: flex; align-items: flex-end; height: 120px; gap: 20px; padding: 0 10px;">
+            <div style="flex: 1; text-align: center;">
+              <div style="height: ${Math.max(20, state.current.temperature * 3)}px; background: #f9d65d; border-radius: 4px 4px 0 0;"></div>
+              <div style="font-size: 11px; margin-top: 6px;">Agora</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div style="height: ${Math.max(20, state.hourly['3h'].temp * 3)}px; background: #f9d65d; border-radius: 4px 4px 0 0;"></div>
+              <div style="font-size: 11px; margin-top: 6px;">+3h</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div style="height: ${Math.max(20, state.hourly['6h'].temp * 3)}px; background: #f9d65d; border-radius: 4px 4px 0 0;"></div>
+              <div style="font-size: 11px; margin-top: 6px;">+6h</div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div style="height: ${Math.max(20, state.hourly['12h'].temp * 3)}px; background: #f9d65d; border-radius: 4px 4px 0 0;"></div>
+              <div style="font-size: 11px; margin-top: 6px;">+12h</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (screen === 'city-search') {
+    screenContent = `
+      <div class="screen-search" style="padding: 20px;">
+        <h3 style="margin-top: 0; color: #f9d65d;">Buscar Cidade & Região</h3>
+        <div style="margin-bottom: 20px;">
+          <input type="text" id="citySearchInput" placeholder="Digite o nome da cidade..."
+                 style="width: 100%; box-sizing: border-box; padding: 12px 16px; border-radius: 8px; border: 1px solid ${borderCol}; background: ${cardBg}; color: inherit; font-size: 15px;"
+                 onkeydown="if (event.key === 'Enter') selectCity(this.value)" />
+        </div>
+        <h4 style="margin: 0 0 12px 0; font-size: 13px; color: ${textMuted};">CIDADES SUGERIDAS</h4>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <button onclick="dispatchWeatherIntent({ type: 'SELECT_CITY', payload: { city: 'São Paulo', country: 'BR', lat: -23.5505, lon: -46.6333 } })"
+                  style="text-align: left; padding: 14px; background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 8px; color: inherit; cursor: pointer;">
+            <div style="font-weight: bold;">São Paulo</div>
+            <div style="font-size: 12px; color: ${textMuted};">Brasil (24.5°C)</div>
+          </button>
+          <button onclick="dispatchWeatherIntent({ type: 'SELECT_CITY', payload: { city: 'Tokyo', country: 'JP', lat: 35.6762, lon: 139.6503 } })"
+                  style="text-align: left; padding: 14px; background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 8px; color: inherit; cursor: pointer;">
+            <div style="font-weight: bold;">Tokyo</div>
+            <div style="font-size: 12px; color: ${textMuted};">Japão (18.0°C)</div>
+          </button>
+          <button onclick="dispatchWeatherIntent({ type: 'SELECT_CITY', payload: { city: 'London', country: 'UK', lat: 51.5074, lon: -0.1278 } })"
+                  style="text-align: left; padding: 14px; background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 8px; color: inherit; cursor: pointer;">
+            <div style="font-weight: bold;">London</div>
+            <div style="font-size: 12px; color: ${textMuted};">Reino Unido (15.2°C)</div>
+          </button>
+          <button onclick="dispatchWeatherIntent({ type: 'SELECT_CITY', payload: { city: 'New York', country: 'US', lat: 40.7128, lon: -74.0060 } })"
+                  style="text-align: left; padding: 14px; background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 8px; color: inherit; cursor: pointer;">
+            <div style="font-weight: bold;">New York</div>
+            <div style="font-size: 12px; color: ${textMuted};">Estados Unidos (19.8°C)</div>
+          </button>
+        </div>
+      </div>
+    `;
+  } else if (screen === 'shader-dma-inspector') {
+    screenContent = `
+      <div class="screen-dma-inspector" style="padding: 20px;">
+        <h3 style="margin-top: 0; color: #f9d65d;">Stationary DMA (0x2000) & WebGPU Inspector</h3>
+        <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px; margin-bottom: 20px; font-family: monospace;">
+          <div style="color: #f9d65d; font-weight: bold; margin-bottom: 8px;">DMA TELEMETRY SLOTS [0x2000 - 0x2020]</div>
+          <div style="font-size: 13px; line-height: 1.6;">
+            0x2000 [Temp]:       ${state.current.temperature.toFixed(2)} °C<br/>
+            0x2004 [Humidity]:   ${state.current.humidity.toFixed(2)} %<br/>
+            0x2008 [Pressure]:   ${state.current.pressure.toFixed(2)} hPa<br/>
+            0x200C [WindSpeed]:  ${state.current.windSpeed.toFixed(2)} km/h<br/>
+            0x2010 [SolarFlux]:  450.00 W/m²<br/>
+            0x2014 [DewPoint]:   ${(state.current.temperature - ((100 - state.current.humidity) / 5)).toFixed(2)} °C<br/>
+            0x2018 [HeatIndex]:  ${(state.current.temperature + 1.2).toFixed(2)} °C<br/>
+            0x201C [WindChill]:  ${state.current.temperature.toFixed(2)} °C
+          </div>
+        </div>
+        <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="font-weight: bold; color: #f9d65d;">WebGPU WGSL Wave Simulator</span>
+            <span style="font-size: 12px; color: ${textMuted};">weather_atmosphere.wgsl</span>
+          </div>
+          <canvas id="atmosphereCanvas" width="400" height="100" style="width: 100%; height: 100px; background: #0e0e16; border-radius: 6px; display: block;"></canvas>
+        </div>
+      </div>
+    `;
+  } else {
+    // forecast-home (Default)
+    screenContent = `
+      <div class="screen-home" style="padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+          <div>
+            <div style="font-size: 26px; font-weight: bold;">${state.location.city}, ${state.location.country}</div>
+            <div style="color: ${textMuted}; font-size: 13px;">${new Date(state.lastSyncTimestamp).toLocaleDateString('pt-BR', { weekday: 'long', hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+          <div style="font-size: 44px;">${icon.unicodeGlyph}</div>
+        </div>
+        <div style="display: flex; align-items: baseline; margin-bottom: 16px;">
+          <span style="font-size: 64px; font-weight: bold; color: #f9d65d;">${Math.round(state.current.temperature)}</span>
+          <span style="font-size: 32px; color: #f9d65d; margin-right: 16px;">°C</span>
+          <span style="font-size: 18px; color: ${textMuted};">${state.current.condition}</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px;">
+          <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 8px; padding: 12px; text-align: center;">
+            <div style="font-size: 11px; color: ${textMuted};">UMIDADE</div>
+            <div style="font-size: 16px; font-weight: bold; margin-top: 4px;">${state.current.humidity}%</div>
+          </div>
+          <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 8px; padding: 12px; text-align: center;">
+            <div style="font-size: 11px; color: ${textMuted};">PRESSÃO</div>
+            <div style="font-size: 16px; font-weight: bold; margin-top: 4px;">${state.current.pressure} hPa</div>
+          </div>
+          <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 8px; padding: 12px; text-align: center;">
+            <div style="font-size: 11px; color: ${textMuted};">VENTO</div>
+            <div style="font-size: 16px; font-weight: bold; margin-top: 4px;">${state.current.windSpeed} km/h</div>
+          </div>
+        </div>
+        <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px;">
+          <div style="font-size: 13px; font-weight: bold; color: ${textMuted}; margin-bottom: 12px;">PREVISÃO PRÓXIMAS HORAS</div>
+          <div style="display: flex; justify-content: space-around;">
+            <div style="text-align: center;">
+              <div style="font-size: 12px; color: ${textMuted};">+3h</div>
+              <div style="font-size: 22px; margin: 4px 0;">${resolveWeatherIcon(state.hourly['3h'].icon).unicodeGlyph}</div>
+              <div style="font-weight: bold;">${state.hourly['3h'].temp.toFixed(0)}°C</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 12px; color: ${textMuted};">+6h</div>
+              <div style="font-size: 22px; margin: 4px 0;">${resolveWeatherIcon(state.hourly['6h'].icon).unicodeGlyph}</div>
+              <div style="font-weight: bold;">${state.hourly['6h'].temp.toFixed(0)}°C</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 12px; color: ${textMuted};">+12h</div>
+              <div style="font-size: 22px; margin: 4px 0;">${resolveWeatherIcon(state.hourly['12h'].icon).unicodeGlyph}</div>
+              <div style="font-weight: bold;">${state.hourly['12h'].temp.toFixed(0)}°C</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="weather-showcase-app" style="background: ${theme.bgColor}; color: ${theme.textColor}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border-radius: 12px; overflow: hidden; border: 1px solid ${borderCol}; max-width: 540px; margin: 0 auto;">
+      <!-- Top Navigation Tabs -->
+      <div style="display: flex; border-bottom: 1px solid ${borderCol}; background: ${isDark ? '#14141e' : '#f5f5f5'};">
+        <button onclick="dispatchWeatherIntent({ type: 'SWITCH_SCREEN', payload: { screen: 'forecast-home' } })"
+                style="flex: 1; padding: 12px 6px; font-size: 12px; font-weight: ${screen === 'forecast-home' ? 'bold' : 'normal'}; background: none; border: none; border-bottom: 2px solid ${screen === 'forecast-home' ? '#f9d65d' : 'transparent'}; color: inherit; cursor: pointer;">
+          Home
+        </button>
+        <button onclick="dispatchWeatherIntent({ type: 'SWITCH_SCREEN', payload: { screen: 'hourly-detail' } })"
+                style="flex: 1; padding: 12px 6px; font-size: 12px; font-weight: ${screen === 'hourly-detail' ? 'bold' : 'normal'}; background: none; border: none; border-bottom: 2px solid ${screen === 'hourly-detail' ? '#f9d65d' : 'transparent'}; color: inherit; cursor: pointer;">
+          Horas
+        </button>
+        <button onclick="dispatchWeatherIntent({ type: 'SWITCH_SCREEN', payload: { screen: 'city-search' } })"
+                style="flex: 1; padding: 12px 6px; font-size: 12px; font-weight: ${screen === 'city-search' ? 'bold' : 'normal'}; background: none; border: none; border-bottom: 2px solid ${screen === 'city-search' ? '#f9d65d' : 'transparent'}; color: inherit; cursor: pointer;">
+          Cidades
+        </button>
+        <button onclick="dispatchWeatherIntent({ type: 'SWITCH_SCREEN', payload: { screen: 'shader-dma-inspector' } })"
+                style="flex: 1; padding: 12px 6px; font-size: 12px; font-weight: ${screen === 'shader-dma-inspector' ? 'bold' : 'normal'}; background: none; border: none; border-bottom: 2px solid ${screen === 'shader-dma-inspector' ? '#f9d65d' : 'transparent'}; color: inherit; cursor: pointer;">
+          DMA / GPU
+        </button>
+        <button onclick="dispatchWeatherIntent({ type: 'SWITCH_SCREEN', payload: { screen: 'location-error-boundary' } })"
+                style="flex: 1; padding: 12px 6px; font-size: 12px; font-weight: ${screen === 'location-error-boundary' ? 'bold' : 'normal'}; background: none; border: none; border-bottom: 2px solid ${screen === 'location-error-boundary' ? '#f9d65d' : 'transparent'}; color: inherit; cursor: pointer;">
+          Erro
+        </button>
+        <button onclick="dispatchWeatherIntent({ type: 'TOGGLE_THEME' })" title="Alternar Tema"
+                style="padding: 12px 14px; background: none; border: none; color: inherit; cursor: pointer; font-size: 14px;">
+          ${isDark ? '☀️' : '🌙'}
+        </button>
+      </div>
+
+      <!-- Active Screen Body -->
+      ${screenContent}
+    </div>
+  `;
+}
+
+// 9. Rich ANSI Console Renderer
 export function renderAnsiWeatherView(state: WeatherState): string {
   const theme = getTheme(state.theme);
   const icon = resolveWeatherIcon(state.current.iconCode);
