@@ -1,7 +1,7 @@
 /**
  * LynxFita Super-App Full Lifecycle End-to-End (E2E) Test
  * Tests Super-App Explorer navigation, Mini-App child Fiber sandboxing,
- * LIFO effect disposers on close/back, and mTLS Federation controls.
+ * LIFO effect disposers on close/back, and Ed25519 Federation controls.
  */
 
 import test from 'node:test';

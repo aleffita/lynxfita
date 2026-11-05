@@ -1,6 +1,6 @@
 {
   "name": "@lynxfita/core",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "LynxFita Core: Direct JSI runtime dispatcher, legacy bridge sequestration, and Static Hermes integration",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

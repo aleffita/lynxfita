@@ -1,6 +1,6 @@
 {
   "name": "@lynxfita/cli",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "LynxFita CLI: Developer tooling to scaffold, build, and verify Static Hermes and CORDIS native modules",
   "bin": {
     "lynxfita": "./bin/lynxfita.js"

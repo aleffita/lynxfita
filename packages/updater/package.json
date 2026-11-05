@@ -1,7 +1,7 @@
 {
   "name": "@lynxfita/updater",
-  "version": "2.1.0",
-  "description": "LynxFita Updater: GitHub Releases integration, deterministic signature verification & mTLS RBAC certificate exchange ledger",
+  "version": "2.2.0",
+  "description": "LynxFita Updater: GitHub Releases integration, Ed25519 digital signature verification and SHA-256 OTA bundle reconciler",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "type": "module",

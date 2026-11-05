@@ -56,10 +56,9 @@ test('Super-App Explorer Real Browser E2E: Full Super-App Journey, Video Recordi
     await page.waitForSelector('.weather-showcase-app', { timeout: 5000 });
     await page.waitForTimeout(250);
 
-    // Weather: DMA & WebGPU Inspector
-    await page.getByRole('button', { name: 'DMA / GPU' }).click();
-    await page.waitForSelector('.screen-dma-inspector', { timeout: 5000 });
-    await page.waitForTimeout(250);
+    // Assert clean real-world weather UI without internal plumbing tabs
+    const dmaButton = page.getByRole('button', { name: 'DMA / GPU' });
+    assert.equal(await dmaButton.count(), 0, 'UI must not expose DMA / GPU internal plumbing tab');
 
     // 3. Navigate Back to Home and assert LIFO Fiber unload
     await page.click('#nav-btn-back');

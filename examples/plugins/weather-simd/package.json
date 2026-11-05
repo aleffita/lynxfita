@@ -1,0 +1,13 @@
+{
+  "name": "@lynxfita/example-plugin-weather-simd",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Cordis plugin for LynxFita: SIMD atmospheric weather compute and Stationary DMA binding",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  }
+}
