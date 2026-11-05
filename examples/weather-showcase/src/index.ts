@@ -10,6 +10,7 @@ export * from './intents.js';
 export * from './weather_service.js';
 export * from './store.js';
 export * from './view.js';
+export * from './WeatherApp.js';
 export * from './plugin.js';
 
 import { pathToFileURL } from 'node:url';

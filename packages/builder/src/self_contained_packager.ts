@@ -7,7 +7,7 @@
  * - release.manifest.json + Ed25519 signature (release.sig)
  */
 
-import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BundlePackager, type BundleManifest } from './bundle_packager.js';
@@ -18,6 +18,7 @@ export interface PackOptions {
   sourceCode: string;
   outputDir: string;
   targetPlatform?: string;
+  signingPrivateKey?: string;
 }
 
 export interface PackResult {
@@ -92,12 +93,21 @@ export class SelfContainedPackager {
     writeFileSync(releaseManifestPath, releaseManifestBytes);
 
     // 4. Ed25519 Signing
-    const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-    const sig = sign(null, releaseManifestBytes, privateKey).toString('hex');
+    let sig: string;
+    let publicKeyPem: string;
+    if (options.signingPrivateKey) {
+      const privateKey = createPrivateKey(options.signingPrivateKey);
+      const publicKey = createPublicKey(privateKey);
+      sig = sign(null, releaseManifestBytes, privateKey).toString('hex');
+      publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+    } else {
+      const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+      sig = sign(null, releaseManifestBytes, privateKey).toString('hex');
+      publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+    }
     const signaturePath = join(packageDir, 'release.sig');
     writeFileSync(signaturePath, sig, 'utf8');
 
-    const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
     const publicKeyPath = join(packageDir, 'release.pub');
     writeFileSync(publicKeyPath, publicKeyPem, 'utf8');
 
