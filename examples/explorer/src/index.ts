@@ -128,7 +128,7 @@ export class SuperAppExplorer {
       this.settingsState.activeFederationBundle =
         role === 'top-patron' || role === 'canary' ? '2.2.0-canary-patron (Remote AOT)' : '2.1.0-stable (Remote AOT)';
     }
-    this.historyManager.log('mtls', `Client identity switched to '${role}' role (${this.settingsState.activeFederationBundle})`);
+    this.historyManager.log('cordis', `Release channel switched to '${role}' (${this.settingsState.activeFederationBundle})`);
   }
 
   public toggleCrlRevocation(): boolean {
@@ -142,10 +142,10 @@ export class SuperAppExplorer {
           : '2.1.0-stable (Remote AOT)';
     }
     this.historyManager.log(
-      'mtls',
+      'cordis',
       this.settingsState.crlRevoked
-        ? 'Certificate serial revoked in live CRL -> Fiber._unload() rollback to 1.0.0-embedded'
-        : `Certificate restored in CRL -> reconciled ${this.settingsState.activeFederationBundle}`
+        ? 'Tampered release signature rejected -> Fiber._unload() rollback to 1.0.0-embedded'
+        : `Valid release signature verified -> reconciled ${this.settingsState.activeFederationBundle}`
     );
     return this.settingsState.crlRevoked;
   }

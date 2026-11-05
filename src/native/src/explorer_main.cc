@@ -31,7 +31,7 @@ void PrintBanner() {
   std::cout << "========================================================================" << std::endl;
   std::cout << "   LynxFita Explorer - Standalone C++20 Native Multi-Platform Engine    " << std::endl;
   std::cout << "   Static Hermes (static_h) | Cell EIB DMA Lanes | Zero-GIL Coroutines  " << std::endl;
-  std::cout << "   Version: v2.1.0 (Release)                                            " << std::endl;
+  std::cout << "   Version: v2.2.0 (Release)                                            " << std::endl;
   std::cout << "========================================================================" << std::endl;
 }
 
@@ -81,10 +81,10 @@ static LRESULT CALLBACK ExplorerWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
       RECT statusRect = {30, 85, rect.right - 30, 250};
       LPCWSTR statusText =
           L"Status: Operational\n"
-          L"Spine: Endogenous Cordis NativeContext (C++20)\n"
-          L"Mini-Apps: weather-showcase | wit-ffi-studio | dma-gpu-lab\n"
-          L"Memory: Stationary DMA 1MB (0x2000 active) | SIMD SSE/AVX\n"
-          L"FFI Plugin: lynxfita_weather_simd_plugin.dll bound to NativeFiber";
+          L"Runtime: Static Hermes C++20 Engine (Endogenous Cordis Spine)\n"
+          L"Active Showcase: Weather Super-App (MVI Reactive Architecture)\n"
+          L"Plugins Mounted: Weather Service, Atmospheric Radar, SIMD Forecast Engine\n"
+          L"Packaging: Hermetic Self-Contained Desktop Target";
       DrawTextW(hdc, statusText, -1, &statusRect, DT_LEFT | DT_TOP);
 
       SelectObject(hdc, oldFont);
@@ -371,7 +371,7 @@ int main(int argc, char* argv[]) {
       return 0;
     }
     if (arg1 == "--version" || arg1 == "-v") {
-      std::cout << "lynxfita_explorer v2.1.0 (C++20 MSVC/GCC/Clang Native Engine)" << std::endl;
+      std::cout << "lynxfita_explorer v2.2.0 (C++20 MSVC/GCC/Clang Native Engine)" << std::endl;
       return 0;
     }
     if (arg1 == "--verify-navigation") {
@@ -391,6 +391,12 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
+#if defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
+  // When launched on Windows without arguments (e.g. double click from Explorer),
+  // launch the native desktop GUI window with the persistent event message loop.
+  return RunGuiMode(false);
+#else
   VerifyNavigationLifecycle();
   return RunIntegratedShowcaseDemo();
+#endif
 }

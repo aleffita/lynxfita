@@ -6,8 +6,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BundlePackager,
-  FederationManifestGenerator
+  FederationManifestGenerator,
+  SelfContainedPackager
 } from '../dist/index.js';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 
 test('BundlePackager produces deterministic HBC bytecode with valid SHA256', () => {
   const source = 'function render() { return 42; }';
@@ -42,3 +46,26 @@ test('FederationManifestGenerator generates valid module federation config', () 
   assert.ok(manifest.shared['@lynxfita/core']?.singleton);
   assert.equal(manifest.remotes['weather-remote'], 'https://remote.lynxfita.org/weather.json');
 });
+
+test('SelfContainedPackager packages hermetic distribution with Ed25519 signature and manifests', () => {
+  const tempDir = join(tmpdir(), `lynxfita-pack-test-${Date.now()}`);
+  const result = SelfContainedPackager.pack({
+    appName: 'desktop-test-app',
+    version: '1.0.0',
+    sourceCode: 'export const msg = "hello self-contained";',
+    outputDir: tempDir
+  });
+
+  assert.ok(existsSync(result.hbcPath));
+  assert.ok(existsSync(result.manifestPath));
+  assert.ok(existsSync(result.releaseManifestPath));
+  assert.ok(existsSync(result.signaturePath));
+  assert.ok(existsSync(result.publicKeyPath));
+  assert.equal(typeof result.signature, 'string');
+  assert.ok(result.signature.length > 64);
+
+  const releaseJson = JSON.parse(readFileSync(result.releaseManifestPath, 'utf8'));
+  assert.equal(releaseJson.appName, 'desktop-test-app');
+  assert.equal(releaseJson.files.length, 2);
+});
+

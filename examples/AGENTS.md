@@ -19,10 +19,11 @@ This directory owns runnable consumer applications built atop the endogenous Cor
 
 ## Subtree Layout
 
-- [`examples/explorer/`](file:///j:/limiar/packages/lynxfita/examples/explorer): Multi-platform Super-App Explorer modeled on [`vendor/lynx/explorer`](file:///j:/limiar/packages/lynxfita/vendor/lynx/explorer), containing:
-  - `homepage/`: Host shell, showcase switcher, live Cordis Fiber tree inspector, DMA hex telemetry viewer (`0x0000`, `0x1000`, `0x2000`), and interactive X.509 mTLS Certificate / Module Federation controls.
+- [`examples/explorer/`](file:///j:/limiar/packages/lynxfita/examples/explorer): Multi-platform Desktop Shell Host & Explorer modeled on [`vendor/lynx/explorer`](file:///j:/limiar/packages/lynxfita/vendor/lynx/explorer), containing:
+  - `homepage/`: Host shell, showcase switcher, live Cordis Fiber tree inspector, DMA hex telemetry viewer (`0x0000`, `0x1000`, `0x2000`), and interactive Ed25519 cryptographic release integrity & OTA Module Federation controls.
   - `showcase/`: Hosted federated micro-frontends and native WIT/WASI/FFI showcases.
 - [`examples/weather-showcase/`](file:///j:/limiar/packages/lynxfita/examples/weather-showcase): Model-View-Intent (MVI) port of [`aleffita/weather-showcase`](https://github.com/aleffita/weather-showcase) consuming `ctx.dma` (`0x2000`), `ctx.gpu` (W3C WebGPU staging + `weather_atmosphere.wgsl`), and `ctx.ffi` (`lynxfita_weather_simd_plugin`).
+- [`examples/plugins/weather-simd/`](file:///j:/limiar/packages/lynxfita/examples/plugins/weather-simd): Standalone reusable Cordis plugin consuming `ctx.dma` (`hardware.dma`) with revertible LIFO effects.
 
 ## Rules
 

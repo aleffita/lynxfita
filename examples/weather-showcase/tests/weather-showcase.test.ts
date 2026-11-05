@@ -58,7 +58,8 @@ test('renderHtmlWeatherApp produces complete reactive DOM structure', () => {
   assert.ok(html.includes('Home'));
   assert.ok(html.includes('Horas'));
   assert.ok(html.includes('Cidades'));
-  assert.ok(html.includes('DMA / GPU'));
+  assert.ok(html.includes('Erro'));
+  assert.equal(html.includes('DMA / GPU'), false);
 });
 
 test('renderAnsiWeatherView renders rich console output', () => {

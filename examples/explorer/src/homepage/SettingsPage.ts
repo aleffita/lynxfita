@@ -26,12 +26,12 @@ export function renderSettingsPage(
   <div style="margin-bottom: 2rem;">
     <h2 style="font-size: 1.5rem; font-weight: 700; margin: 0 0 0.5rem 0;">Settings & Diagnostics</h2>
     <p style="font-size: 0.9rem; color: ${theme.textMuted}; margin: 0;">
-      Cryptographic X.509 mTLS Authority, Module Federation Channels, and Cordis Service Registry.
+      Ed25519 Release Integrity, Module Federation Channels, and Cordis Service Registry.
     </p>
   </div>
 
   <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-    <!-- mTLS Authority Card -->
+    <!-- Ed25519 Release Integrity & OTA Card -->
     <section style="
       background: ${theme.surface};
       border: 1px solid ${theme.border};
@@ -41,10 +41,10 @@ export function renderSettingsPage(
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
         <div>
           <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0 0 0.25rem 0;">
-            X.509 Mutual TLS (mTLS) Client Identity
+            Ed25519 Cryptographic Release Integrity & OTA Channels
           </h3>
           <p style="font-size: 0.85rem; color: ${theme.textMuted}; margin: 0;">
-            Cryptographic RBAC verified via native Node.js X509Certificate and node:https TLS handshake.
+            Release authenticity and bundle provenance verified via Ed25519 digital signatures and SHA-256 digests.
           </p>
         </div>
         <span style="
@@ -56,7 +56,7 @@ export function renderSettingsPage(
           font-size: 0.75rem;
           font-weight: 700;
         ">
-          ${state.crlRevoked ? 'CERTIFICATE REVOKED' : 'CERTIFICATE VALID'}
+          ${state.crlRevoked ? 'SIGNATURE REJECTED (CERTIFICATE REVOKED)' : 'ED25519 SIGNATURE VALID (CERTIFICATE VALID)'}
         </span>
       </div>
 
@@ -74,8 +74,8 @@ export function renderSettingsPage(
         ">
           <input type="radio" name="mtlsRole" value="viewer" ${state.activeRole === 'viewer' ? 'checked' : ''} onchange="window.lynxfitaSetRole('viewer')">
           <div>
-            <div style="font-weight: 600; font-size: 0.9rem;">Viewer</div>
-            <div style="font-size: 0.75rem; color: ${theme.textMuted};">Read-only forecast access</div>
+            <div style="font-weight: 600; font-size: 0.9rem;">Stable Release</div>
+            <div style="font-size: 0.75rem; color: ${theme.textMuted};">Production forecast bundle</div>
           </div>
         </label>
 
@@ -92,7 +92,7 @@ export function renderSettingsPage(
         ">
           <input type="radio" name="mtlsRole" value="top-patron" ${state.activeRole === 'top-patron' ? 'checked' : ''} onchange="window.lynxfitaSetRole('top-patron')">
           <div>
-            <div style="font-weight: 600; font-size: 0.9rem;">Top-Patron</div>
+            <div style="font-weight: 600; font-size: 0.9rem;">Top-Patron Channel</div>
             <div style="font-size: 0.75rem; color: ${theme.textMuted};">SIMD FFI + Canary OTA access</div>
           </div>
         </label>
@@ -110,7 +110,7 @@ export function renderSettingsPage(
         ">
           <input type="radio" name="mtlsRole" value="canary" ${state.activeRole === 'canary' ? 'checked' : ''} onchange="window.lynxfitaSetRole('canary')">
           <div>
-            <div style="font-weight: 600; font-size: 0.9rem;">Canary Release</div>
+            <div style="font-weight: 600; font-size: 0.9rem;">Canary Channel</div>
             <div style="font-size: 0.75rem; color: ${theme.textMuted};">Experimental WASI components</div>
           </div>
         </label>
@@ -131,7 +131,7 @@ export function renderSettingsPage(
           "
           onclick="window.lynxfitaToggleCrlRevocation()"
         >
-          ${state.crlRevoked ? 'Restore Certificate in CRL' : 'Revoke Certificate in CRL (Simulate Compromise)'}
+          ${state.crlRevoked ? 'Restore Valid Release Signature' : 'Simulate Tampered Signature (Revoke Certificate / Rollback)'}
         </button>
       </div>
     </section>

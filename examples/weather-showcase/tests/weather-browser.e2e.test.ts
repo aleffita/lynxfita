@@ -68,29 +68,23 @@ test('Weather Showcase Real Browser E2E: 5 MVI Screens, Tokyo Selection, DMA Tel
 
     // 5. Toggle Theme (Dark -> Light)
     const themeBtn = page.locator('button[title="Alternar Tema"]');
-    await themeBtn.click();
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {}),
+      themeBtn.click()
+    ]);
     await page.waitForSelector('.weather-showcase-app', { timeout: 5000 });
+    await page.waitForTimeout(300);
 
     // Save light mode screenshot
     const lightShotPath = resolve(assetsDir, 'weather-showcase-light.png');
     await page.screenshot({ path: lightShotPath, fullPage: false, animations: 'disabled' });
     assert.ok(existsSync(lightShotPath), 'weather-showcase-light.png must be saved');
 
-    // 6. Screen 4: Shader DMA & GPU Inspector
-    await page.getByRole('button', { name: 'DMA / GPU' }).click();
-    await page.waitForSelector('.screen-dma-inspector', { timeout: 5000 });
-    const dmaText = await page.textContent('.screen-dma-inspector');
-    assert.ok(dmaText?.includes('Stationary DMA (0x2000) & WebGPU Inspector'), 'Must show DMA inspector title');
-    assert.ok(dmaText?.includes('DMA TELEMETRY SLOTS [0x2000 - 0x2020]'), 'Must show DMA slots header');
-    assert.ok(dmaText?.includes('0x2000 [Temp]:'), 'Must show 0x2000 temperature slot');
-    assert.ok(dmaText?.includes('0x2004 [Humidity]:'), 'Must show 0x2004 humidity slot');
-    assert.ok(dmaText?.includes('0x2008 [Pressure]:'), 'Must show 0x2008 pressure slot');
-    assert.ok(dmaText?.includes('0x200C [WindSpeed]:'), 'Must show 0x200C wind speed slot');
+    // 6. Assert clean real-world weather UI without internal plumbing tabs
+    const dmaButton = page.getByRole('button', { name: 'DMA / GPU' });
+    assert.equal(await dmaButton.count(), 0, 'UI must not expose DMA / GPU internal plumbing tab');
 
-    const canvas = page.locator('#atmosphereCanvas');
-    assert.ok(await canvas.isVisible(), 'Atmosphere WebGPU canvas must be present in DOM');
-
-    // 7. Screen 5: Location Error Boundary & Recovery
+    // 7. Screen 4: Location Error Boundary & Recovery
     await page.getByRole('button', { name: 'Erro' }).click();
     await page.waitForSelector('.screen-error', { timeout: 5000 });
     const errorText = await page.textContent('.screen-error');

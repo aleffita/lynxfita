@@ -1,8 +1,8 @@
 {
   "name": "@lynxfita/explorer",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "type": "module",
-  "description": "WeChat-Style Super-App Explorer for LynxFita native desktop and embedded runtime",
+  "description": "Desktop Shell Host & Explorer for LynxFita native desktop and embedded runtime",
   "author": "Alef Oliveira (Alefita) <me@aleffita.dev>",
   "license": "Apache-2.0",
   "main": "./dist/index.js",

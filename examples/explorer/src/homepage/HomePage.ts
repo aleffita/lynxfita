@@ -48,13 +48,11 @@ export const REGISTERED_MINIAPPS: readonly MiniAppGridCard[] = [
 ];
 
 export function renderHomePage(
-  context: LynxFitaContext,
+  _context: LynxFitaContext,
   themeManager: ThemeManager,
   historyManager: SessionHistoryManager
 ): string {
   const theme = themeManager.getColors();
-  const dma = context.dma;
-  const dmaSize = dma ? dma.sizeBytes : 16384;
   const recentEvents = historyManager.getEvents().slice(-5).reverse();
 
   return `
@@ -77,7 +75,7 @@ export function renderHomePage(
         LynxFita Mini-App Host & Explorer
       </h2>
       <p style="font-size: 0.85rem; color: ${theme.textMuted}; margin: 0;">
-        Endogenous Cordis Plugin Spine &bull; Stationary DMA &bull; C++20 SIMD FFI &bull; X.509 mTLS Federation
+        Endogenous Cordis Plugin Spine &bull; Stationary DMA &bull; C++20 SIMD FFI &bull; Ed25519 OTA Federation
       </p>
     </div>
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
@@ -89,7 +87,7 @@ export function renderHomePage(
         padding: 4px 10px;
         font-size: 0.75rem;
         font-weight: 600;
-      ">DMA: ${dmaSize} Bytes</span>
+      ">Runtime: Static Hermes C++20</span>
       <span style="
         background: rgba(72, 187, 120, 0.15);
         color: #48bb78;
@@ -98,7 +96,7 @@ export function renderHomePage(
         padding: 4px 10px;
         font-size: 0.75rem;
         font-weight: 600;
-      ">Cordis Fiber Active</span>
+      ">Desktop Shell: Ready</span>
       <span style="
         background: rgba(66, 153, 225, 0.15);
         color: #4299e1;
@@ -107,7 +105,7 @@ export function renderHomePage(
         padding: 4px 10px;
         font-size: 0.75rem;
         font-weight: 600;
-      ">mTLS: Active</span>
+      ">Release: Ed25519 Verified</span>
     </div>
   </section>
 

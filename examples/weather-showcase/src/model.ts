@@ -37,7 +37,7 @@ export type WeatherScreen =
   | 'forecast-home'
   | 'hourly-detail'
   | 'city-search'
-  | 'shader-dma-inspector'
+  | 'atmosphere-radar'
   | 'location-error-boundary';
 
 export interface WeatherState {

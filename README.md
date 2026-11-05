@@ -2,9 +2,9 @@
 
 # LynxFita
 
-**Cordis-Powered Native Desktop & Embedded Runtime for LynxJS**
+**Self-Contained Native Desktop Application Runtime for LynxJS**
 
-*Static Hermes (`static_h`) &bull; C++20 JSI & Dynamic `.dll`/`.so` FFI &bull; WIT/WASI Components &bull; 64B Stationary DMA &bull; X.509 mTLS Module Federation*
+*Static Hermes (`static_h`) &bull; C++20 JSI Engine & Dynamic FFI &bull; WIT/WASI Components &bull; 64B Stationary DMA &bull; Ed25519 Release Integrity*
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://github.com/aleffita/lynxfita/actions/workflows/ci.yml/badge.svg)](https://github.com/aleffita/lynxfita/actions)
@@ -26,9 +26,31 @@
 
 ---
 
-## 1. Overview & Endogenous Cordis Architecture
+## 1. Overview & Self-Contained Desktop Architecture
 
-**LynxFita** replaces the Node.js + IPC JSON bridge in LynxJS desktop hosts with a unified, all-plugin runtime built on **Static Hermes (`static_h`)**, **C++20 JSI**, **64-byte-aligned Stationary DMA**, and **[Cordis](https://github.com/shigma/cordis)** ([`vendor/cordis`](vendor/cordis), [arXiv:2608.25512](https://arxiv.org/abs/2608.25512)).
+**LynxFita** replaces Lynxtron (`vendor/lynxtron`) and the heavy Node.js + IPC JSON bridge in LynxJS desktop hosts with a unified, self-contained desktop runtime built on **Static Hermes (`static_h`)**, **C++20 JSI**, **64-byte-aligned Stationary DMA**, and **[Cordis](https://github.com/shigma/cordis)** ([`vendor/cordis`](vendor/cordis), [arXiv:2608.25512](https://arxiv.org/abs/2608.25512)).
+
+### The Self-Contained Desktop Paradigm (AppImage Model)
+
+Following the Linux AppImage (Type 2) packaging model, LynxFita builds desktop applications into self-contained, hermetic executable distributions:
+
+```
++-----------------------------------------------------------------------------------+
+| Self-Contained Desktop Target (Linux AppImage / Portable Win32 PE / macOS .app)   |
+|                                                                                   |
+|  1. C++20 Native Host Runtime (Static Hermes + JSI Engine)                        |
+|  2. Release Integrity & Signature Section (.upd_info + Ed25519 signature)         |
+|  3. Hermetic Embedded Payload:                                                    |
+|     ├── bundles/ (Compiled .hbc Hermes bytecode for application & UI)             |
+|     ├── plugins/ (Dynamic native libraries .dll/.so/.dylib & Cordis plugins)      |
+|     └── assets/  (Static media, icons, and fonts)                                 |
++-----------------------------------------------------------------------------------+
+```
+
+- **Zero Manual DLL Wrangling**: Developers and end-users never manually copy DLLs or configure system PATH variables. The packager bundles native host binaries, precompiled bytecode, and plugins into a relocatable tree with deterministic relative library loading (`SetDllDirectoryW` on Windows, `RUNPATH`/`$ORIGIN` on Linux, `@executable_path` on macOS).
+- **Replacing Lynxtron**: Lynxtron embeds a complete Node.js instance (~120 MB initial heap) and communicates across an asynchronous IPC JSON bridge. LynxFita embeds Static Hermes C++20 (~6 MB initial heap), replaces JSON IPC with synchronous in-process JSI, and binds directly to 64-byte Stationary DMA memory.
+
+### Cordis Capability Seams
 
 Every runtime capability—across both the TypeScript control plane (`LynxFitaContext`) and the C++20 native engine (`lynxfita::cordis::NativeContext`)—is mounted as a Cordis **Service** with explicit `inject` coeffects and revertible `ctx.effect()` disposers:
 
@@ -40,28 +62,27 @@ Every runtime capability—across both the TypeScript control plane (`LynxFitaCo
 | **`ctx.ffi`** | `FfiService` (`@lynxfita/core`) | `NativeFfiLoader` (`native_ffi_loader.cc`) | Cross-platform dynamic shared library loader (`LoadLibraryExW` on Win32, `dlopen` on Linux/macOS) with automatic `FreeLibrary`/`dlclose` on `Fiber._unload()`. |
 | **`ctx.wasi`** | `WasiComponentService` (`@lynxfita/wasi-runtime`) | `WasiHostModule` (`wasi_host_module.cc`) | WIT (WebAssembly Interface Types) universal module IR (`@lynxfita/codegen`) + LEB128 Wasm binary parser and stack machine bound to Stationary DMA. |
 | **`ctx.gpu`** | `GpuService` (`@lynxfita/core`) | — | W3C WebGPU two-buffer staging (`MAP_READ` / `COPY_DST`), WGSL compute shaders, and `huggingface/kernels` catalog dispatch. |
-| **`ctx.authority`** | `MtlsAuthorityServer` (`@lynxfita/updater`) | — | Real `node:https` / `node:tls` X.509 mTLS Authority Server (`requestCert: true`), role-bearing client certificates (`viewer`, `top-patron`, `canary`), and live Certificate Revocation List (CRL). |
-| **`ctx.federation`** | `FederationService` (`@lynxfita/updater`) | — | Reconciles embedded installation bundles (`1.0.0-embedded`) against remote federated bundles (`2.1.0-stable`, `2.2.0-canary-patron`) and unloads child Fibers on live CRL revocation. |
+| **`ctx.federation`** | `FederationService` (`@lynxfita/updater`) | — | Reconciles embedded installation bundles (`1.0.0-embedded`) against remote federated bundles using Ed25519 cryptographic signatures and SHA-256 payload integrity verification, with deterministic rollback on mismatch. |
 
-> Interactive architecture diagrams: [`docs/architecture/cordis-spine.html`](docs/architecture/cordis-spine.html) &bull; [`docs/architecture/mtls-federation.html`](docs/architecture/mtls-federation.html) &bull; [`docs/cordis-primer.md`](docs/cordis-primer.md)
+> Interactive architecture overview: [`docs/cordis-primer.md`](docs/cordis-primer.md) &bull; [`docs/architecture/001-lynx-vs-lynxtron-desktop-dichotomy.md`](docs/architecture/001-lynx-vs-lynxtron-desktop-dichotomy.md)
 
 ---
 
-## 2. WeChat-Style Super-App Explorer & Showcases
+## 2. Desktop Shell & Application Showcases
 
-In LynxFita, **the Explorer IS the Super-App** (modeled on WeChat Mini-Program containers, [`vendor/lynx/explorer`](vendor/lynx/explorer), and [`vendor/sparkling`](vendor/sparkling)). Each Mini-App launches via `lynxfita://miniapp/<id>` inside an isolated child Cordis Fiber (`ctx.isolate()`), acquiring DMA and FFI resources through `ctx.effect()` and unwinding them in LIFO order on navigation back or certificate revocation.
+Applications and plugins run in isolated Cordis Fibers (`ctx.isolate()`), acquiring DMA and FFI resources through revertible `ctx.effect()` registrations and releasing them in LIFO order on teardown:
 
 <div align="center">
-  <img src="docs/assets/lynxfita-explorer-demo.gif" alt="LynxFita Super-App Explorer Live Session" width="100%" />
+  <img src="docs/assets/lynxfita-explorer-demo.gif" alt="LynxFita Desktop Explorer Session" width="100%" />
 </div>
 
-| Mini-App / Host Target | Path | Capabilities Demonstrated |
+| Project / Showcase | Path | Capabilities Demonstrated |
 | :--- | :--- | :--- |
-| **Super-App Explorer Host** | [`examples/explorer`](examples/explorer) | Scheme router (`lynxfita://home`, `lynxfita://settings`, `lynxfita://miniapp/*`), isolated Cordis Fiber container manager, live DMA segment telemetry, X.509 mTLS identity switcher, and interactive HTTP server (`pnpm explore` at `http://127.0.0.1:4173`). |
-| **Weather Showcase MVI** | [`examples/weather-showcase`](examples/weather-showcase) | Multi-screen MVI port of [`aleffita/weather-showcase`](https://github.com/aleffita/weather-showcase) (`forecast-home`, `hourly-detail`, `city-search`, `shader-dma-inspector`, `location-error-boundary`), Dark/Light themes (`#f9d65d`), all 14 OpenWeatherMap icon mappings, and WGSL wave shaders bound to DMA `0x2000`. |
-| **WIT & Native SIMD Studio** | [`examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts`](examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts) | Interactive WIT interface parser (`parseWitSpec`), universal IR code generator, and zero-copy SIMD advection execution over DMA `0x2000`. |
-| **Stationary DMA & GPU Lab** | [`examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts`](examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts) | Live 16 KB Stationary DMA slot visualizer (`0x0000`–`0x3FFF`), raw hex memory inspector, and 60 FPS atmospheric wave particle canvas. |
-| **`lynxfita_explorer` Native Host** | [`src/native/src/explorer_main.cc`](src/native/src/explorer_main.cc) | Self-contained C++20 executable supporting Win32 desktop GUI window (`--gui`), `.hbc` bytecode execution (`--run`), and automated Super-App navigation verification (`--verify-navigation`). |
+| **Desktop Shell Host** | [`examples/explorer`](examples/explorer) | Desktop application shell, route navigation (`lynxfita://home`, `lynxfita://settings`, `lynxfita://miniapp/*`), isolated Cordis Fiber container manager, Stationary DMA memory inspector, and HTTP dev preview server (`pnpm explore` at `http://127.0.0.1:4173`). |
+| **Weather Showcase MVI** | [`examples/weather-showcase`](examples/weather-showcase) | Real desktop weather application built on MVI unidirectional architecture (`forecast-home`, `hourly-detail`, `city-search`, `location-error-boundary`), dark/light themes (`#f9d65d`), all 14 OpenWeatherMap conditions, with background SIMD and DMA telemetry synchronization. |
+| **WIT & Native SIMD Studio** | [`examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts`](examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts) | Interactive WIT interface parser (`parseWitSpec`), universal IR code generator, and zero-copy SIMD execution over DMA offset `0x2000`. |
+| **Stationary DMA & GPU Lab** | [`examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts`](examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts) | 16 KB Stationary DMA slot layout visualizer (`0x0000`–`0x3FFF`), raw memory inspector, and 60 FPS atmospheric wave canvas. |
+| **`lynxfita_explorer` Native Host** | [`src/native/src/explorer_main.cc`](src/native/src/explorer_main.cc) | Self-contained C++20 native executable supporting Win32 desktop GUI window (`--gui`), `.hbc` bytecode execution (`--run`), and automated navigation verification (`--verify-navigation`). |
 
 <p align="center">
   <img src="docs/assets/weather-showcase-dark.png" alt="Weather Showcase Dark Mode" width="49%" />
@@ -70,18 +91,13 @@ In LynxFita, **the Explorer IS the Super-App** (modeled on WeChat Mini-Program c
 
 ---
 
-## 3. X.509 mTLS Module Federation & Live CRL Rollback
+## 3. Ed25519 Release Integrity & OTA Module Federation
 
-<div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="docs/assets/mtls-federation-light.png" />
-    <img src="docs/assets/mtls-federation-dark.png" alt="X.509 mTLS Module Federation & CRL Rollback Sequence" width="100%" />
-  </picture>
-</div>
+LynxFita separates application runtime execution from identity management. Cryptography exists exclusively for **release integrity**, **binary provenance**, and **verified over-the-air (OTA) updates**:
 
-1. **Cryptographic X.509 RBAC (`ctx.authority`)**: `packages/updater/src/x509.ts` and `authority_service.ts` generate ASN.1 DER X.509 v3 Root CA, Server, and role-bearing Client certificates (`OU=viewer`, `OU=top-patron`, `OU=canary`) verified by `node:crypto.X509Certificate` and `node:https` (`requestCert: true`).
-2. **Bundler Module Federation (`ctx.federation`)**: Reconciles the embedded installation bundle (`1.0.0-embedded`) against signed remote federated bundles (`2.1.0-stable` or `2.2.0-canary-patron`), compiling remote payloads into `.hbc` bytecode via `ctx.compiler` before mounting the child Fiber.
-3. **Deterministic CRL Revocation Rollback**: When a client certificate serial is added to the live Certificate Revocation List (`revokeCertificate(serial)`), `ctx.federation` invokes `remoteFiber._unload()`—calling `FreeLibrary`/`dlclose` on native plugins and releasing DMA slots—and restores the embedded baseline bundle without dropping the Explorer host process.
+1. **Signed Release Manifests (`@lynxfita/builder`)**: The build pipeline packages compiled Hermes bytecode (`.hbc`), native plugins, and assets, computing SHA-256 digests for each artifact in `release.manifest.json`. The manifest is cryptographically signed using the release authority's Ed25519 private key (`release.sig`).
+2. **Cryptographic Integrity Verification (`@lynxfita/updater`)**: When checking for OTA updates via GitHub Releases or package registries, `@lynxfita/updater` verifies the Ed25519 digital signature against the embedded public key and checks that every payload SHA-256 matches before staging.
+3. **Deterministic Rollback & Fallback (`ctx.federation`)**: If a remote bundle fails signature verification, contains a mismatched checksum, or encounters a runtime fault, the reconciler unloads the child Fiber and falls back deterministically to the embedded installation baseline bundle (`1.0.0-embedded`), maintaining host stability.
 
 ---
 
@@ -106,12 +122,14 @@ Measured via `pnpm bench` ([`benchmarks/run_benchmarks.ts`](benchmarks/run_bench
 
 ---
 
-## 5. Quick Start & Verification Commands
+## 5. Quick Start & Developer Workflow
 
 ### Prerequisites
 - Windows 10/11 (x64), Linux (Ubuntu 22.04+), or macOS (arm64)
 - Node.js (v22.6+ with `--experimental-strip-types`) & pnpm (v10+)
 - CMake (3.20+) & C++20 compiler (MSVC 2022/2026, Clang 16+, or GCC 13+)
+
+### Build & Verification Commands
 
 ```bash
 # 1. Install dependencies & materialize workspace proxies
@@ -120,17 +138,41 @@ pnpm install
 # 2. Compile all TypeScript workspaces
 pnpm build
 
-# 3. Run the full verification pyramid (anti-slop docs gate + 32 unit + integration + E2E tests)
+# 3. Run the full verification pyramid (anti-slop docs gate + unit + integration + E2E browser tests)
 pnpm test
 
 # 4. Build and run the native C++20 engine, dynamic .dll/.so plugin, and 14 native test suites
 pnpm test:native
 
-# 5. Launch the interactive WeChat-style Super-App Explorer at http://127.0.0.1:4173
+# 5. Launch the interactive desktop shell explorer at http://127.0.0.1:4173
 pnpm explore
 
 # 6. Execute Kalibera & Jones N = 30 statistical benchmarks and update BENCHMARK.md
 pnpm bench
+```
+
+### `@lynxfita/cli` Commands
+
+The LynxFita CLI manages the development lifecycle of desktop applications and Cordis plugins:
+
+```bash
+# Scaffold a new self-contained desktop project
+lynxfita init project my-weather-app
+
+# Scaffold a new reusable Cordis plugin
+lynxfita init plugin my-simd-filter
+
+# Start local development mode with live reload
+lynxfita dev
+
+# Compile Hermes bytecode (.hbc) and build native host targets
+lynxfita build
+
+# Package self-contained executable distribution (AppImage / Portable PE / .app)
+lynxfita pack
+
+# Inspect system toolchains, GPU drivers, and Stationary DMA availability
+lynxfita doctor
 ```
 
 ---
@@ -145,17 +187,18 @@ lynxfita/
 ├── BENCHMARK.md             # Reproducible Kalibera & Jones statistical benchmark report
 ├── .agents/                 # Specialist agent profiles & skills (archify, dsh-prose-standard, record-browser-gif)
 ├── benchmarks/              # N = 30 statistical benchmark harness & JSON provenance (benchmarks/AGENTS.md)
-├── docs/                    # Architecture diagrams, Cordis primer, transcripts & glossary (docs/AGENTS.md)
-├── examples/                # Super-App Explorer & multi-screen Weather Showcase MVI (examples/AGENTS.md)
-│   ├── explorer/            # WeChat-style Super-App host shell, Mini-Apps & HTTP dev server
-│   └── weather-showcase/    # 5-screen MVI weather radar with WGSL shaders & DMA 0x2000 sync
+├── docs/                    # Architecture documentation, Cordis primer, transcripts & glossary (docs/AGENTS.md)
+├── examples/                # Desktop Shell Explorer, Weather Showcase MVI & plugins (examples/AGENTS.md)
+│   ├── explorer/            # Desktop shell host, application containers & HTTP dev server
+│   ├── weather-showcase/    # Clean MVI weather radar with SIMD acceleration & DMA 0x2000 sync
+│   └── plugins/             # Standalone Cordis plugin projects (weather-simd)
 ├── packages/                # Pure TypeScript Cordis workspaces (packages/AGENTS.md)
 │   ├── core/                # LynxFitaContext, Fiber, Service, Stationary DMA, Protobuf, HBC VM & WebGPU
 │   ├── codegen/             # WIT universal module IR parser & typed Cordis/JSI/WASI generator
 │   ├── wasi-runtime/        # WASI component service bound to Stationary DMA
-│   ├── builder/             # Federated bundle compiler, SHA-256 manifest signer & REPACK packager
-│   ├── updater/             # Real node:https X.509 mTLS Authority Server, RBAC & live CRL Federation
-│   └── cli/                 # Developer CLI (init, codegen, build, doctor)
+│   ├── builder/             # Self-contained bundle packager, Hermes compiler & signed manifest generator
+│   ├── updater/             # Ed25519 release integrity, SHA-256 payload verification & OTA reconciler
+│   └── cli/                 # Developer CLI (init, codegen, build, pack, doctor)
 ├── scripts/                 # Pure TypeScript workspace setup, native build/test, vendor sync & docs verifier
 ├── src/native/              # C++20 NativeContext, LoadLibraryExW/dlopen FFI, HBC VM, Wasm VM & lynxfita_explorer
 ├── tests/                   # Cross-package integration & full-lifecycle E2E test suites
