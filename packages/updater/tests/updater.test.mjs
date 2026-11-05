@@ -75,3 +75,125 @@ test('MtlsRbacLedger - issues certificates and authenticates RBAC roles', () => 
     ledger.authenticateDevice('workstation-alpha', 'bundle:download');
   }, /revoked/);
 });
+
+test('GitHubReleasesUpdater - fetchLatestReleaseFromGitHub parses checksums.sha256 for assets', async () => {
+  const origFetch = globalThis.fetch;
+  const mockSha = 'a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0';
+
+  globalThis.fetch = async (url) => {
+    const urlStr = String(url);
+    if (urlStr.includes('/releases/latest')) {
+      return {
+        ok: true,
+        json: async () => ({
+          tag_name: 'v2.0.1',
+          published_at: '2026-11-04T23:00:00Z',
+          body: 'LynxFita 2.0.1 Patch',
+          assets: [
+            {
+              name: 'lynxfita-windows-x64-v2.0.1.zip',
+              browser_download_url: 'https://downloads/lynxfita-windows-x64-v2.0.1.zip',
+              size: 15420000
+            },
+            {
+              name: 'checksums.sha256',
+              browser_download_url: 'https://downloads/checksums.sha256',
+              size: 120
+            }
+          ]
+        })
+      };
+    }
+    if (urlStr === 'https://downloads/checksums.sha256') {
+      return {
+        ok: true,
+        text: async () => `${mockSha}  lynxfita-windows-x64-v2.0.1.zip\n`
+      };
+    }
+    throw new Error(`Unexpected fetch URL: ${urlStr}`);
+  };
+
+  try {
+    const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.0');
+    const release = await updater.fetchLatestReleaseFromGitHub();
+
+    assert.equal(release.version, '2.0.1');
+    assert.equal(release.tagName, 'v2.0.1');
+    const winAsset = release.assets.find(a => a.name === 'lynxfita-windows-x64-v2.0.1.zip');
+    assert.ok(winAsset);
+    assert.equal(winAsset.sha256, mockSha);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('GitHubReleasesUpdater - fetchOtaBundleFromGitHubPackages consumes real registry metadata and tarball', async () => {
+  const origFetch = globalThis.fetch;
+  const remoteBytecode = new Uint8Array([0x1F, 0x48, 0x42, 0x43, 96, 0, 0, 0, 0xDE, 0xAD, 0xBE, 0xEF]);
+
+  globalThis.fetch = async (url) => {
+    const urlStr = String(url);
+    if (urlStr.includes('npm.pkg.github.com/@aleffita/lynxfita-bundle-test')) {
+      return {
+        ok: true,
+        json: async () => ({
+          'dist-tags': { latest: '2.0.5' },
+          versions: {
+            '2.0.5': {
+              dist: {
+                tarball: 'https://npm.pkg.github.com/download/lynxfita-bundle-test-2.0.5.tgz'
+              }
+            }
+          }
+        })
+      };
+    }
+    if (urlStr === 'https://npm.pkg.github.com/download/lynxfita-bundle-test-2.0.5.tgz') {
+      return {
+        ok: true,
+        arrayBuffer: async () => remoteBytecode.buffer
+      };
+    }
+    throw new Error(`Unexpected fetch URL: ${urlStr}`);
+  };
+
+  try {
+    const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.0');
+    const ota = await updater.fetchOtaBundleFromGitHubPackages('lynxfita-bundle-test', '2.0.5');
+
+    assert.equal(ota.packageName, '@aleffita/lynxfita-bundle-test');
+    assert.equal(ota.version, '2.0.5');
+    assert.equal(ota.bytecode[0], 0x1F);
+    assert.equal(ota.bytecode[8], 0xDE);
+    assert.equal(ota.bytecode[9], 0xAD);
+    assert.equal(ota.verified, true);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('GitHubReleasesUpdater - fallback to offline deterministic release and OTA when offline or 404', async () => {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 404,
+    statusText: 'Not Found'
+  });
+
+  try {
+    const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.0');
+    const release = await updater.fetchLatestReleaseFromGitHub();
+    assert.equal(release.version, '2.0.0');
+    assert.equal(release.assets.length, 3);
+    assert.ok(release.assets[0].sha256.length === 64);
+
+    const ota = await updater.fetchOtaBundleFromGitHubPackages('lynxfita-bundle-offline', '2.0.0');
+    assert.equal(ota.packageName, '@aleffita/lynxfita-bundle-offline');
+    assert.equal(ota.version, '2.0.0');
+    assert.equal(ota.bytecode[0], 0x1F); // Hermes magic
+    assert.equal(ota.verified, true);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+

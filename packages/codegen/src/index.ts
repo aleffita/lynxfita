@@ -205,7 +205,7 @@ export class JsiCodeGenerator {
         return '';
       }).join('\n');
 
-      const callArgs = m.parameters.map(p => `arg_${p.name}`).join(', ');
+      const callArgs = m.parameters.map(p => p.type === 'number' ? `arg_${p.name}_typed` : `arg_${p.name}`).join(', ');
       const invocation = m.returnType === 'void'
         ? `      this->${m.name}(${callArgs});\n      return std::monostate{};`
         : `      return this->${m.name}(${callArgs});`;

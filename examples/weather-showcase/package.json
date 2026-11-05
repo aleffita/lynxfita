@@ -1,6 +1,6 @@
 {
   "name": "@lynxfita/example-weather-showcase",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Port MVI of aleffita/weather-showcase with WebGPU/WGSL atmospheric shaders and Stationary DMA telemetry",
   "type": "module",

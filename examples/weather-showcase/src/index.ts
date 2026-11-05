@@ -12,12 +12,13 @@ export * from './store.js';
 export * from './view.js';
 export * from './plugin.js';
 
+import { pathToFileURL } from 'node:url';
 import { WeatherStore } from './store.js';
 import { Intents } from './intents.js';
 import { renderAnsiWeatherView } from './view.js';
 
 // Interactive/Demo execution if executed directly
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.log('===============================================================');
   console.log('   LynxFita Weather Showcase - MVI Architecture & DMA Lane     ');
   console.log('===============================================================');

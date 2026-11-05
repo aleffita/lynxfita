@@ -103,3 +103,17 @@ test('parseTypeScriptSpec supports function property signatures', () => {
   assert.equal(spec.methods[1].returnType, 'buffer');
 });
 
+test('JsiCodeGenerator generates typed arguments for number parameters in C++ header', () => {
+  const gen = new JsiCodeGenerator();
+  const spec = parseTypeScriptSpec(`
+    export interface NativeSensorSpec {
+      computeReading: (sensorId: string, gain: number) => number;
+    }
+  `);
+
+  const header = gen.generateCppHeader(spec);
+  assert.ok(header.includes('auto arg_gain_typed = arg_gain;'));
+  assert.ok(header.includes('this->computeReading(arg_sensorId, arg_gain_typed)'));
+});
+
+
