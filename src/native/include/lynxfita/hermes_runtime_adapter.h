@@ -1,6 +1,9 @@
 #pragma once
 
-#include "jsi_types.h"
+#include "lynxfita/jsi_types.h"
+#include "lynxfita/cordis_native_context.h"
+#include <hermes/hermes.h>
+#include <jsi/jsi.h>
 #include <string>
 #include <memory>
 #include <unordered_map>
@@ -11,13 +14,17 @@ namespace lynxfita {
 
 class DmaEibEngine;
 
-class HermesRuntimeAdapter {
+class HermesRuntimeAdapter : public cordis::NativeService {
  public:
   HermesRuntimeAdapter();
-  ~HermesRuntimeAdapter();
+  ~HermesRuntimeAdapter() override;
 
   bool Initialize(bool enable_inspector = false);
   void Teardown();
+  bool IsInitialized() const { return initialized_; }
+
+  facebook::hermes::HermesRuntime* GetHermesRuntime() const { return runtime_.get(); }
+  facebook::jsi::Runtime& GetJsiRuntime();
 
   void AttachDmaEngine(std::shared_ptr<DmaEibEngine> dma);
   std::shared_ptr<DmaEibEngine> GetDmaEngine() const { return dma_engine_; }
@@ -32,6 +39,7 @@ class HermesRuntimeAdapter {
                                   size_t length,
                                   const std::string& source_url,
                                   const std::vector<JsiValueVariant>& args = {});
+
   ExecutionResult EvaluateSource(const std::string& source_code,
                                 const std::string& source_url,
                                 const std::vector<JsiValueVariant>& args = {});
@@ -41,11 +49,12 @@ class HermesRuntimeAdapter {
                                 const std::vector<JsiValueVariant>& args);
 
   RuntimeType GetRuntimeType() const { return RuntimeType::HermesAOT; }
-  std::string GetRuntimeVersion() const { return "Hermes-0.13.0-StaticH"; }
+  std::string GetRuntimeVersion() const;
 
  private:
   bool initialized_{false};
   std::shared_ptr<DmaEibEngine> dma_engine_{nullptr};
+  std::unique_ptr<facebook::hermes::HermesRuntime> runtime_{nullptr};
   std::unordered_map<std::string, std::shared_ptr<HostObject>> host_objects_;
   std::unordered_map<std::string, HostFunction> host_functions_;
 };

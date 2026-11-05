@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lynxfita/jsi_types.h"
+#include "lynxfita/cordis_native_context.h"
 #include <vector>
 #include <string>
 #include <memory>
@@ -16,26 +17,12 @@ enum class HermesCompilerMode : uint8_t {
   StaticJitHybrid = 0x04
 };
 
-enum class HbcOpcode : uint8_t {
-  OP_CONST_F64 = 0x01,
-  OP_CONST_STR = 0x02,
-  OP_LOAD_ARG  = 0x03,
-  OP_ADD       = 0x04,
-  OP_SUB       = 0x05,
-  OP_MUL       = 0x06,
-  OP_DIV       = 0x07,
-  OP_CALL_HOST = 0x08,
-  OP_DMA_LOAD_F32  = 0x09,
-  OP_DMA_STORE_F32 = 0x0A,
-  OP_RET       = 0x0B
-};
-
 struct CompilationOptions {
   bool optimize_aot{true};
   bool static_h_mode{true};
   bool hybrid_jit{false};
   bool generate_debug_symbols{false};
-  uint32_t bytecode_version{96};
+  uint32_t bytecode_version{0};
 };
 
 struct CompilationResult {
@@ -47,22 +34,24 @@ struct CompilationResult {
   uint64_t compilation_time_ns{0};
 };
 
-// Hermes Compiler exposed in the runtime environment
-class HermesRuntimeCompiler {
+class HermesRuntimeCompiler : public cordis::NativeService {
  public:
-  HermesRuntimeCompiler() = default;
-  ~HermesRuntimeCompiler() = default;
+  HermesRuntimeCompiler();
+  ~HermesRuntimeCompiler() override = default;
 
-  // Compile JavaScript/TypeScript source code into Hermes Bytecode (.hbc)
+  // Compile JavaScript source code into authentic Hermes Bytecode (.hbc) using hermes::compileJS
   CompilationResult CompileSource(const std::string& source_code,
                                   const std::string& source_url,
                                   const CompilationOptions& options = CompilationOptions{});
 
-  // Verify whether a buffer is valid Hermes bytecode
+  // Verify whether a buffer is valid Hermes bytecode using IHermesRootAPI::isHermesBytecode
   static bool ValidateBytecode(const uint8_t* bytecode_data, size_t length);
 
-  // Extract 64-bit FNV source hash from bytecode
-  static uint64_t ExtractSourceHash(const uint8_t* bytecode_data, size_t length);
+  // Extract 64-bit hash from bytecode payload
+  static uint64_t ExtractBytecodeHash(const uint8_t* bytecode_data, size_t length);
+  static uint64_t ExtractSourceHash(const uint8_t* bytecode_data, size_t length) {
+    return ExtractBytecodeHash(bytecode_data, length);
+  }
 
   // Attach active runtime adapter for hot-reload re-evaluation
   void AttachRuntimeAdapter(std::shared_ptr<HermesRuntimeAdapter> adapter);
@@ -74,20 +63,41 @@ class HermesRuntimeCompiler {
 
  private:
   std::vector<std::string> loaded_bundles_;
-  std::shared_ptr<HermesRuntimeAdapter> adapter_;
+  std::shared_ptr<HermesRuntimeAdapter> adapter_{nullptr};
 };
 
 // JSI HostObject exposing the compiler directly to JavaScript
 class HermesCompilerHostObject : public HostObject {
  public:
-  explicit HermesCompilerHostObject(std::shared_ptr<HermesRuntimeCompiler> compiler);
-  ~HermesCompilerHostObject() override = default;
+  explicit HermesCompilerHostObject(std::shared_ptr<HermesRuntimeCompiler> compiler)
+      : compiler_(std::move(compiler)) {}
 
   std::string GetName() const override { return "HermesCompiler"; }
-  JsiValueVariant GetProperty(const std::string& name) override;
-  void SetProperty(const std::string& name, const JsiValueVariant& value) override;
-  std::vector<std::string> GetPropertyNames() const override;
-  JsiValueVariant InvokeMethod(const std::string& name, const std::vector<JsiValueVariant>& args) override;
+
+  std::vector<std::string> GetPropertyNames() const override {
+    return {"loadedBundleCount", "compile"};
+  }
+
+  JsiValueVariant GetProperty(const std::string& name) override {
+    if (name == "loadedBundleCount") {
+      return static_cast<int64_t>(compiler_ ? compiler_->GetLoadedBundleCount() : 0);
+    }
+    return std::monostate{};
+  }
+
+  JsiValueVariant InvokeMethod(const std::string& method_name, const std::vector<JsiValueVariant>& args) override {
+    if (method_name == "compile" && !args.empty()) {
+      std::string code = JsiValueToString(args[0]);
+      if (compiler_) {
+        auto res = compiler_->CompileSource(code, "dynamic.js");
+        if (res.success) {
+          return "Compiled HBC (" + std::to_string(res.bytecode.size()) + " bytes)";
+        }
+        return "Compilation failed: " + res.error_message;
+      }
+    }
+    return std::monostate{};
+  }
 
  private:
   std::shared_ptr<HermesRuntimeCompiler> compiler_;

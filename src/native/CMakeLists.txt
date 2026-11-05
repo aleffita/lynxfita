@@ -1,15 +1,28 @@
 cmake_minimum_required(VERSION 3.20)
-project(lynxfita_native VERSION 2.1.0 LANGUAGES CXX)
+project(lynxfita_native VERSION 2.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+if(WIN32)
+    add_definitions(-DNOMINMAX)
+endif()
+
 find_package(Threads REQUIRED)
 
-# Include paths
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+# Upstream Hermes Submodule Configuration
+set(HERMES_ENABLE_TOOLS ON CACHE BOOL "" FORCE)
+set(HERMES_ENABLE_TEST_SUITE OFF CACHE BOOL "" FORCE)
+set(HERMES_ENABLE_DEBUGGER OFF CACHE BOOL "" FORCE)
+set(HERMES_ENABLE_NAPI OFF CACHE BOOL "" FORCE)
+set(HERMES_ENABLE_CORE_EXTENSIONS OFF CACHE BOOL "" FORCE)
+set(HERMES_ENABLE_CONTRIB_EXTENSIONS OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/hermes
+    ${CMAKE_BINARY_DIR}/vendor/hermes
+    EXCLUDE_FROM_ALL
 )
 
 # Dynamically loaded Weather SIMD Shared Library Plugin
@@ -36,11 +49,21 @@ add_library(lynxfita_native STATIC
 
 target_include_directories(lynxfita_native PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/hermes/API/jsi>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/hermes/API/hermes>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/hermes/public>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/hermes/include>
     $<INSTALL_INTERFACE:include>
 )
 
 target_link_libraries(lynxfita_native PUBLIC
     Threads::Threads
+    hermesapi
+    hermesvm_a
+    jsi
+    hermesPublic
+    hermesSupport
+    compileJS
 )
 
 if(CMAKE_DL_LIBS)
@@ -59,7 +82,7 @@ target_link_libraries(lynxfita_native_tests PRIVATE
     Threads::Threads
 )
 
-add_dependencies(lynxfita_native_tests lynxfita_weather_simd_plugin)
+add_dependencies(lynxfita_native_tests lynxfita_weather_simd_plugin hermesc)
 
 add_test(NAME LynxFitaNativeTests COMMAND lynxfita_native_tests)
 
@@ -77,4 +100,4 @@ if(WIN32)
     target_link_libraries(lynxfita_explorer PRIVATE user32 gdi32)
 endif()
 
-add_dependencies(lynxfita_explorer lynxfita_weather_simd_plugin)
+add_dependencies(lynxfita_explorer lynxfita_weather_simd_plugin hermesc)

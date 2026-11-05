@@ -44,23 +44,37 @@ static CoroutineGenerator<int> FibonacciGenerator(int count) {
 }
 
 void TestHermesRuntimeAdapter() {
-  std::cout << "[RUN] TestHermesRuntimeAdapter..." << std::endl;
+  std::cout << "[RUN] TestHermesRuntimeAdapter (Meta Hermes & JSI)..." << std::endl;
   HermesRuntimeAdapter adapter;
   bool init_ok = adapter.Initialize(false);
   assert(init_ok);
   assert(adapter.GetRuntimeType() == RuntimeType::HermesAOT);
 
-  // Register host function
+  // 1. Register authentic host function
   bool reg_fn = adapter.RegisterHostFunction("computeSha", [](const std::vector<JsiValueVariant>&) -> JsiValueVariant {
     return std::string("hash_computed");
   });
   assert(reg_fn);
 
-  // Evaluate Bytecode with magic bytes \x1fHBC
-  const uint8_t valid_hbc[] = {0x1F, 'H', 'B', 'C', 0x01, 0x02, 0x03, 0x04};
-  auto eval_res = adapter.EvaluateBytecode(valid_hbc, sizeof(valid_hbc), "app.hbc");
+  // 2. Evaluate JavaScript source calling host function
+  auto eval_src = adapter.EvaluateSource("computeSha()", "test_fn.js");
+  assert(eval_src.IsSuccess());
+  assert(eval_src.result_payload == "hash_computed");
+
+  // 3. Evaluate real JavaScript calculation
+  auto eval_calc = adapter.EvaluateSource("const a = 19; const b = 23; a + b;", "calc.js");
+  assert(eval_calc.IsSuccess());
+  assert(eval_calc.result_payload == "42");
+
+  // 4. Compile and evaluate real Hermes Bytecode
+  HermesRuntimeCompiler compiler;
+  auto comp_res = compiler.CompileSource("const answer = 42; answer;", "test_bc.js");
+  assert(comp_res.success);
+  assert(!comp_res.bytecode.empty());
+
+  auto eval_res = adapter.EvaluateBytecode(comp_res.bytecode.data(), comp_res.bytecode.size(), "app.hbc");
   assert(eval_res.IsSuccess());
-  assert(eval_res.result_payload.find("Hermes Bytecode Loaded") != std::string::npos);
+  assert(eval_res.result_payload == "42");
 
   // Bytecode empty test
   auto empty_res = adapter.EvaluateBytecode(nullptr, 0, "empty.hbc");
@@ -517,18 +531,18 @@ void TestHermesCompiler() {
   opts.static_h_mode = true;
   opts.bytecode_version = 96;
 
-  auto res = compiler->CompileSource("export const answer = 42; export default answer;", "bundle://app.js", opts);
+  auto res = compiler->CompileSource("const answer = 42; answer;", "bundle://app.js", opts);
   assert(res.success);
   assert(!res.bytecode.empty());
   assert(res.bytecode.size() >= 16);
   assert(res.source_fnv_hash != 0);
   assert(!res.symbols_table.empty());
 
-  // 2. Validate magic bytes: 0x1F, 'H', 'B', 'C'
+  // 2. Validate magic bytes with authentic Meta Hermes API
   assert(HermesRuntimeCompiler::ValidateBytecode(res.bytecode.data(), res.bytecode.size()));
-  assert(HermesRuntimeCompiler::ExtractSourceHash(res.bytecode.data(), res.bytecode.size()) == res.source_fnv_hash);
+  assert(HermesRuntimeCompiler::ExtractBytecodeHash(res.bytecode.data(), res.bytecode.size()) != 0);
   assert(!HermesRuntimeCompiler::ValidateBytecode(nullptr, 0));
-  assert(HermesRuntimeCompiler::ExtractSourceHash(nullptr, 0) == 0);
+  assert(HermesRuntimeCompiler::ExtractBytecodeHash(nullptr, 0) == 0);
 
   // 3. Hot reload bundle connected to runtime adapter
   assert(compiler->HotReloadBundle("main_bundle", res.bytecode.data(), res.bytecode.size()));
@@ -544,7 +558,7 @@ void TestHermesCompiler() {
   assert(std::holds_alternative<int64_t>(host_obj->GetProperty("loadedBundleCount")));
   assert(std::get<int64_t>(host_obj->GetProperty("loadedBundleCount")) == 1);
 
-  auto compile_res = host_obj->InvokeMethod("compile", { std::string("export const x = 1;") });
+  auto compile_res = host_obj->InvokeMethod("compile", { std::string("const x = 1; x;") });
   assert(std::holds_alternative<std::string>(compile_res));
   assert(std::get<std::string>(compile_res).find("Compiled HBC") != std::string::npos);
 
@@ -638,13 +652,13 @@ void TestHermesBytecodeVM() {
   bool init_ok = adapter.Initialize(false);
   assert(init_ok);
 
-  // 1. Compile arithmetic expression
-  auto comp_res = compiler.CompileSource("const calc = (a, b) => a * 2.5 + b / 2.0;", "calc.js");
+  // 1. Compile arithmetic expression into authentic Hermes bytecode
+  auto comp_res = compiler.CompileSource("const calc = (a, b) => a * 2.5 + b / 2.0; calc(4.0, 6.0);", "calc.js");
   assert(comp_res.success);
   assert(!comp_res.bytecode.empty());
 
-  // 2. Execute on stack machine
-  auto eval_res = adapter.EvaluateBytecode(comp_res.bytecode.data(), comp_res.bytecode.size(), "calc.js", { 4.0, 6.0 });
+  // 2. Execute on authentic Hermes runtime
+  auto eval_res = adapter.EvaluateBytecode(comp_res.bytecode.data(), comp_res.bytecode.size(), "calc.js");
   assert(eval_res.IsSuccess());
   double val = std::stod(eval_res.result_payload);
   // 4.0 * 2.5 + 6.0 / 2.0 = 10.0 + 3.0 = 13.0
