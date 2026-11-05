@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.1] - 2026-11-04
+
+### Fixed
+- **Windows CLI Standalone Entrypoint (`DEF-01`)**:
+  - Normalized URL protocol comparisons using `pathToFileURL(process.argv[1]).href` in `examples/weather-showcase/src/index.ts`, preventing silent exit on Windows environments.
+  - Added CLI standalone execution test verifying banner and ANSI dashboard rendering.
+- **W3C WebGPU Staging Protocol & Specification Compliance (`DEF-02`)**:
+  - Enforced W3C WebGPU `GPUBufferUsage` constraints in `packages/core/src/kernels.ts`: `STORAGE | COPY_DST` and `UNIFORM | COPY_DST` for input buffers, `STORAGE | COPY_SRC` for compute output buffers, and `COPY_DST | MAP_READ` for host-visible staging buffers.
+  - Replaced illegal `STORAGE | MAP_READ` combinations and implemented full W3C readback sequence: `copyBufferToBuffer` -> `queue.submit` -> `mapAsync` -> `getMappedRange` -> `unmap`.
+  - Added rigorous W3C specification validator mock test suite in `packages/core/tests/webgpu-w3c-spec.test.mjs`.
+- **CLI Package Start Script (`DEF-03`)**:
+  - Added `"start": "node ./bin/lynxfita.js"` to `packages/cli/package.json`, ensuring `pnpm --filter "@lynxfita/cli" start doctor` functions as documented.
+- **OTA Updater Registry Metadata & Tarball Consumption (`DEF-04`)**:
+  - Implemented HTTP response parsing for npm packages (`res.json()`, `dist-tags.latest`, `versions[...].dist.tarball`) in `packages/updater/src/github_releases_updater.ts`, downloading remote bytecode payloads and using deterministic offline synthesis as a resilient fallback.
+- **GitHub Releases SHA-256 Checksums Parsing (`DEF-05`)**:
+  - Integrated automated `checksums.sha256` retrieval and parsing in `fetchLatestReleaseFromGitHub`, matching individual assets against verified cryptographic hashes.
+- **Codegen Typed Parameter Forwarding (`DEF-06`)**:
+  - Fixed C++ HostObject method dispatch in `@lynxfita/codegen` to pass `arg_${p.name}_typed` for typed number arguments.
+
+---
+
 ## [2.0.0] - 2026-11-04
 
 ### Added

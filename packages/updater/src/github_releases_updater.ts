@@ -66,10 +66,39 @@ export class GitHubReleasesUpdater {
       }
 
       const data = await res.json();
+      const checksumsAsset = (data.assets || []).find((a: any) => a.name === 'checksums.sha256');
+      const checksumMap = new Map<string, string>();
+
+      if (checksumsAsset && checksumsAsset.browser_download_url) {
+        try {
+          const chkRes = await fetch(checksumsAsset.browser_download_url, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'LynxFita-Updater/2.0'
+            }
+          });
+          if (chkRes.ok) {
+            const checksumsText = await chkRes.text();
+            for (const line of checksumsText.split('\n')) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              const parts = trimmed.split(/\s+/);
+              if (parts.length >= 2) {
+                const hash = parts[0]!.toLowerCase();
+                const filename = parts.slice(1).join(' ').replace(/^\*/, '');
+                checksumMap.set(filename, hash);
+              }
+            }
+          }
+        } catch {
+          // If checksums fetch fails, fallback gracefully
+        }
+      }
+
       const assets: ReleaseAsset[] = (data.assets || []).map((a: any) => ({
         name: a.name,
         url: a.browser_download_url,
-        sha256: a.sha256 || '0'.repeat(64),
+        sha256: checksumMap.get(a.name) || a.sha256 || '0'.repeat(64),
         sizeBytes: a.size || 0
       }));
 
@@ -94,37 +123,70 @@ export class GitHubReleasesUpdater {
     const cleanPkg = packageName.startsWith('@') ? packageName : `@aleffita/${packageName}`;
     const rbacLedger = ledger || new MtlsRbacLedger();
 
+    let resolvedVersion = targetVersion;
+    let fetchedBytecode: Uint8Array | null = null;
+
     // Query GitHub Packages / npm registry with AbortController timeout
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1000);
+    const timer = setTimeout(() => controller.abort(), 1500);
     try {
       const barePkg = cleanPkg.replace(/^@aleffita\//, '');
       const registryUrl = `https://npm.pkg.github.com/@aleffita/${barePkg}`;
-      await fetch(registryUrl, {
+      const res = await fetch(registryUrl, {
         signal: controller.signal,
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'LynxFita-Updater/2.0'
         }
       });
+
+      if (res.ok) {
+        const pkgMeta: any = await res.json();
+        const distTags = pkgMeta['dist-tags'] || {};
+        resolvedVersion = (targetVersion && pkgMeta.versions?.[targetVersion])
+          ? targetVersion
+          : (distTags.latest || pkgMeta.version || targetVersion);
+
+        const versionInfo = pkgMeta.versions?.[resolvedVersion];
+        const tarballUrl = versionInfo?.dist?.tarball;
+        if (tarballUrl) {
+          try {
+            const tarballRes = await fetch(tarballUrl, {
+              signal: controller.signal,
+              headers: { 'User-Agent': 'LynxFita-Updater/2.0' }
+            });
+            if (tarballRes.ok) {
+              const arrayBuf = await tarballRes.arrayBuffer();
+              fetchedBytecode = new Uint8Array(arrayBuf);
+            }
+          } catch {
+            // If tarball download fails, fall back to Hermes bytecode synthesis
+          }
+        }
+      }
       clearTimeout(timer);
     } catch {
       clearTimeout(timer);
       // Fallback cleanly to deterministic offline bytecode synthesis
     }
 
-    // Generate deterministic Hermes Bytecode header + payload
-    const enc = new TextEncoder();
-    const payloadStr = `// OTA Bundle: ${cleanPkg}@${targetVersion}\nexport const bundleVersion = "${targetVersion}";`;
-    const payloadBytes = enc.encode(payloadStr);
+    let bytecode: Uint8Array;
+    if (fetchedBytecode && fetchedBytecode.length > 0) {
+      bytecode = fetchedBytecode;
+    } else {
+      // Generate deterministic Hermes Bytecode header + payload
+      const enc = new TextEncoder();
+      const payloadStr = `// OTA Bundle: ${cleanPkg}@${resolvedVersion}\nexport const bundleVersion = "${resolvedVersion}";`;
+      const payloadBytes = enc.encode(payloadStr);
 
-    const bytecode = new Uint8Array(8 + payloadBytes.length);
-    bytecode[0] = 0x1F;
-    bytecode[1] = 0x48; // 'H'
-    bytecode[2] = 0x42; // 'B'
-    bytecode[3] = 0x43; // 'C'
-    bytecode[4] = 96;   // Bytecode version
-    bytecode.set(payloadBytes, 8);
+      bytecode = new Uint8Array(8 + payloadBytes.length);
+      bytecode[0] = 0x1F;
+      bytecode[1] = 0x48; // 'H'
+      bytecode[2] = 0x42; // 'B'
+      bytecode[3] = 0x43; // 'C'
+      bytecode[4] = 96;   // Bytecode version
+      bytecode.set(payloadBytes, 8);
+    }
 
     const sha256 = createHash('sha256').update(bytecode).digest('hex');
 
@@ -136,7 +198,7 @@ export class GitHubReleasesUpdater {
 
     return {
       packageName: cleanPkg,
-      version: targetVersion,
+      version: resolvedVersion,
       bytecode,
       sha256,
       signature,

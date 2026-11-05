@@ -1,6 +1,6 @@
 {
   "name": "lynxfita",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Next-Gen High-Performance Desktop & Embedded Runtime for LynxJS: Static Hermes, Direct JSI Engine Interop, WASI Native Modules & Zero-JSON-Bridge Architecture",
   "author": "Alef Oliveira (Alefita) <me@aleffita.dev>",

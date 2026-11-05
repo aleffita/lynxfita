@@ -23,6 +23,23 @@ export interface ComputeExecutionResult<T> {
 }
 
 /**
+ * W3C WebGPU GPUBufferUsage standard bitflags
+ * https://www.w3.org/TR/webgpu/#buffer-usage
+ */
+export const GPUBufferUsageFlags = {
+  MAP_READ: 0x0001,
+  MAP_WRITE: 0x0002,
+  COPY_SRC: 0x0004,
+  COPY_DST: 0x0008,
+  INDEX: 0x0010,
+  VERTEX: 0x0020,
+  UNIFORM: 0x0040,
+  STORAGE: 0x0080,
+  INDIRECT: 0x0100,
+  QUERY_RESOLVE: 0x0200
+} as const;
+
+/**
  * Standard WGSL Compute Shader for Fused Multiply-Add Tensor Vector operations:
  * dst[i] = a[i] + b[i] * scale
  */
@@ -182,10 +199,26 @@ export class WebGpuComputePipeline {
               compute: { module: shaderModule, entryPoint: 'main' }
             });
             const byteLen = count * 4;
-            const bufA = device.createBuffer({ size: byteLen, usage: 0x0080 | 0x0004 });
-            const bufB = device.createBuffer({ size: byteLen, usage: 0x0080 | 0x0004 });
-            const bufParams = device.createBuffer({ size: 16, usage: 0x0040 | 0x0004 });
-            const bufDst = device.createBuffer({ size: byteLen, usage: 0x0080 | 0x0001 });
+            const bufA = device.createBuffer({
+              size: byteLen,
+              usage: GPUBufferUsageFlags.STORAGE | GPUBufferUsageFlags.COPY_DST
+            });
+            const bufB = device.createBuffer({
+              size: byteLen,
+              usage: GPUBufferUsageFlags.STORAGE | GPUBufferUsageFlags.COPY_DST
+            });
+            const bufParams = device.createBuffer({
+              size: 16,
+              usage: GPUBufferUsageFlags.UNIFORM | GPUBufferUsageFlags.COPY_DST
+            });
+            const bufDst = device.createBuffer({
+              size: byteLen,
+              usage: GPUBufferUsageFlags.STORAGE | GPUBufferUsageFlags.COPY_SRC
+            });
+            const stagingBuffer = device.createBuffer({
+              size: byteLen,
+              usage: GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.MAP_READ
+            });
 
             device.queue.writeBuffer(bufA, 0, a.buffer, a.byteOffset, byteLen);
             device.queue.writeBuffer(bufB, 0, b.buffer, b.byteOffset, byteLen);
@@ -210,7 +243,20 @@ export class WebGpuComputePipeline {
             passEncoder.setBindGroup(0, bindGroup);
             passEncoder.dispatchWorkgroups(Math.ceil(count / 64));
             passEncoder.end();
+
+            commandEncoder.copyBufferToBuffer(bufDst, 0, stagingBuffer, 0, byteLen);
             device.queue.submit([commandEncoder.finish()]);
+
+            await stagingBuffer.mapAsync(GPUBufferUsageFlags.MAP_READ);
+            const mapped = stagingBuffer.getMappedRange(0, byteLen);
+            dst.set(new Float32Array(mapped));
+            stagingBuffer.unmap();
+
+            if (typeof stagingBuffer.destroy === 'function') stagingBuffer.destroy();
+            if (typeof bufDst.destroy === 'function') bufDst.destroy();
+            if (typeof bufA.destroy === 'function') bufA.destroy();
+            if (typeof bufB.destroy === 'function') bufB.destroy();
+            if (typeof bufParams.destroy === 'function') bufParams.destroy();
 
             const elapsedUs = (performance.now() - start) * 1000;
             const flops = count * 2;
@@ -300,7 +346,10 @@ export class WebGpuComputePipeline {
             });
 
             // 6-field WeatherTelemetry uniform struct: temp, humidity, pressure, windSpeed, particleCount, deltaTime
-            const uniformBuffer = device.createBuffer({ size: 32, usage: 0x0040 | 0x0004 });
+            const uniformBuffer = device.createBuffer({
+              size: 32,
+              usage: GPUBufferUsageFlags.UNIFORM | GPUBufferUsageFlags.COPY_DST
+            });
             const uniformData = new ArrayBuffer(32);
             const uniformView = new DataView(uniformData);
             uniformView.setFloat32(0, temp, true);
@@ -312,8 +361,18 @@ export class WebGpuComputePipeline {
             device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
             const byteLen = particles.byteLength;
-            const bufIn = device.createBuffer({ size: byteLen, usage: 0x0080 | 0x0004 });
-            const bufOut = device.createBuffer({ size: byteLen, usage: 0x0080 | 0x0001 });
+            const bufIn = device.createBuffer({
+              size: byteLen,
+              usage: GPUBufferUsageFlags.STORAGE | GPUBufferUsageFlags.COPY_DST
+            });
+            const bufOut = device.createBuffer({
+              size: byteLen,
+              usage: GPUBufferUsageFlags.STORAGE | GPUBufferUsageFlags.COPY_SRC
+            });
+            const stagingBuffer = device.createBuffer({
+              size: byteLen,
+              usage: GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.MAP_READ
+            });
 
             device.queue.writeBuffer(bufIn, 0, particles.buffer, particles.byteOffset, byteLen);
 
@@ -332,7 +391,19 @@ export class WebGpuComputePipeline {
             passEncoder.setBindGroup(0, bindGroup);
             passEncoder.dispatchWorkgroups(Math.ceil(particleCount / 64));
             passEncoder.end();
+
+            commandEncoder.copyBufferToBuffer(bufOut, 0, stagingBuffer, 0, byteLen);
             device.queue.submit([commandEncoder.finish()]);
+
+            await stagingBuffer.mapAsync(GPUBufferUsageFlags.MAP_READ);
+            const mapped = stagingBuffer.getMappedRange(0, byteLen);
+            out.set(new Float32Array(mapped));
+            stagingBuffer.unmap();
+
+            if (typeof stagingBuffer.destroy === 'function') stagingBuffer.destroy();
+            if (typeof bufOut.destroy === 'function') bufOut.destroy();
+            if (typeof bufIn.destroy === 'function') bufIn.destroy();
+            if (typeof uniformBuffer.destroy === 'function') uniformBuffer.destroy();
 
             const elapsedUs = (performance.now() - start) * 1000;
             const ops = particleCount * 14;

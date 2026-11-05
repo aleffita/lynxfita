@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import {
   BaseTheme,
   DarkTheme,
@@ -222,3 +225,12 @@ test('WeatherApiService - Live and deterministic offline fallback execution', as
   assert.equal(direct.current.temperature, direct2.current.temperature);
   assert.equal(direct.current.humidity, direct2.current.humidity);
 });
+
+test('Standalone CLI entrypoint - Executes correctly via Node CLI', () => {
+  const indexPath = path.resolve(fileURLToPath(import.meta.url), '../../dist/index.js');
+  const stdout = execFileSync(process.execPath, [indexPath], { encoding: 'utf-8' });
+  assert.match(stdout, /LynxFita Weather Showcase - MVI Architecture & DMA Lane/);
+  assert.match(stdout, /Verifying Stationary DMA Lane Telemetry at 0x2000/);
+  assert.match(stdout, /Weather Showcase demonstration completed successfully\./);
+});
+
