@@ -1,0 +1,24 @@
+{
+  "name": "@lynxfita/explorer",
+  "version": "2.1.0",
+  "type": "module",
+  "description": "WeChat-Style Super-App Explorer for LynxFita native desktop and embedded runtime",
+  "author": "Alef Oliveira (Alefita) <me@aleffita.dev>",
+  "license": "Apache-2.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^5.8.2"
+  }
+}

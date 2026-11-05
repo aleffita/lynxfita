@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-11-05
+
+### Added
+- **Endogenous Cordis Plugin Spine (`@lynxfita/core`, `src/native/src/cordis_native_context.cc`)**:
+  - Unified TypeScript (`LynxFitaContext`, `Fiber`, `Service`) and C++20 (`lynxfita::cordis::NativeContext`, `NativeFiber`) capability seams (`ctx.dma`, `ctx.protobuf`, `ctx.compiler`, `ctx.ffi`, `ctx.wasi`, `ctx.gpu`, `ctx.router`, `ctx.authority`, `ctx.federation`) with `inject` coeffects and LIFO `effect()` disposers.
+- **Cross-Platform Dynamic Shared Library FFI Loader (`src/native/src/native_ffi_loader.cc`, `src/native/plugins/weather_simd_plugin.cc`)**:
+  - Compiled shared library target `lynxfita_weather_simd_plugin` (`.dll` on Win32, `.so` on Linux, `.dylib` on macOS) executing SIMD atmospheric advection and telemetry compute over Stationary DMA offset `0x2000`.
+  - Dynamic loader using `LoadLibraryExW`/`GetProcAddress`/`FreeLibrary` on Windows and `dlopen`/`dlsym`/`dlclose` on POSIX, bound to `NativeFiber` teardown.
+- **Authentic `.hbc` Bytecode Compiler & Stack VM (`src/native/src/hermes_compiler.cc`, `hermes_runtime_adapter.cc`)**:
+  - Shunting-yard expression compiler emitting `.hbc` opcodes (`OP_CONST_F64`, `OP_CONST_STR`, `OP_LOAD_ARG`, `OP_ADD`, `OP_SUB`, `OP_MUL`, `OP_DIV`, `OP_CALL_HOST`, `OP_DMA_LOAD_F32`, `OP_DMA_STORE_F32`, `OP_RET`) and stack VM execution over DMA and host callbacks.
+- **WebAssembly LEB128 Binary Decoder & Stack Machine (`src/native/src/wasi_host_module.cc`)**:
+  - Binary section parser (Type `0x01`, Function `0x03`, Memory `0x05`, Export `0x07`, Code `0x0a`) and instruction interpreter (`local.get`, `local.set`, `i32.*`, `f32.*`, `f32.load`, `f32.store`) bound to Stationary DMA.
+- **WIT Universal Module IR Codegen (`@lynxfita/codegen`)**:
+  - `parseWitSpec` parser for WebAssembly Interface Types (`.wit`), generating typed Cordis `Service` definitions, Stationary DMA layouts, C++20 JSI headers, and WASI component bindings.
+- **Real X.509 v3 mTLS Authority Server & Bundler Module Federation (`@lynxfita/updater`, `@lynxfita/builder`)**:
+  - ASN.1 DER X.509 v3 certificate builder (`packages/updater/src/x509.ts`) verified by `node:crypto.X509Certificate`, live `node:https` mTLS server (`requestCert: true`), role extraction (`viewer`, `top-patron`, `canary`), and live Certificate Revocation List (CRL) triggering automatic `Fiber._unload()` rollback to the embedded installation bundle (`1.0.0-embedded`).
+- **WeChat-Style Super-App Explorer (`examples/explorer/`, `src/native/src/explorer_main.cc`)**:
+  - Scheme router (`lynxfita://home`, `lynxfita://settings`, `lynxfita://miniapp/*`), isolated Cordis Fiber Mini-App containers (`weather-showcase`, `wit-ffi-studio`, `dma-gpu-lab`), interactive HTTP dev server (`pnpm explore`), and native Win32/CLI host (`lynxfita_explorer --gui`, `--verify-navigation`).
+- **Kalibera & Jones Statistical Benchmarks (`benchmarks/run_benchmarks.ts`, `BENCHMARK.md`)**:
+  - Reproducible $N = 30$ benchmark suite (with 10 discarded warm-up rounds) across `64 B`, `4 KB`, `64 KB`, and `1 MB` payloads reporting $p50$, IQR, $p95$, $p99$, mean $\pm$ 95% CI, CV%, MB/s, and $\Delta\text{Heap}$.
+- **Validated Archify Architecture Diagrams & Recursive Governance**:
+  - Delivered `docs/architecture/cordis-spine.html` and `docs/architecture/mtls-federation.html` validated across 4 desktop viewports, plus 7 recursive `AGENTS.md` indexers and `docs/cordis-primer.md`.
+
+### Removed
+- Removed root `Dockerfile`, `scripts/test-native.cmd`, legacy `.mjs` script/test files, and 1-file stub examples (`examples/super-app`, `examples/desktop-hermes-app`) in favor of a 100% pure TypeScript workspace and the unified `examples/explorer/` Super-App.
+
+---
+
 ## [2.0.1] - 2026-11-04
 
 ### Fixed

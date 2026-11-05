@@ -6,3 +6,6 @@ export * from './coroutine.js';
 export * from './protobuf.js';
 export * from './kernels.js';
 export * from './compiler.js';
+export * from './ffi.js';
+export * from './gpu.js';
+export * from './router.js';

@@ -1,7 +1,9 @@
 /**
- * Hermes Runtime Compiler Client
+ * Hermes Runtime Compiler Client & Cordis Service
  * Enables Ahead-of-Time and dynamic bytecode compilation and hot-reloading at runtime.
  */
+
+import { Service, type LynxFitaContext } from './cordis.js';
 
 declare global {
   var __lynxfita_hermes_compiler: any;
@@ -50,5 +52,22 @@ export class HermesCompilerClient {
       return Boolean(globalThis.__lynxfita_hermes_compiler.hotReload(bundleName, sourceCodeOrBytecode));
     }
     return true;
+  }
+}
+
+export class CompilerService extends Service {
+  public static provide = 'compiler';
+  public static inject = [];
+
+  constructor(ctx: LynxFitaContext) {
+    super(ctx, 'compiler');
+  }
+
+  public compile(code: string, url = 'bundle://app.js'): BytecodeCompilationOutput {
+    return HermesCompilerClient.compileToBytecode(code, url);
+  }
+
+  public hotReload(bundle: string, payload: string): boolean {
+    return HermesCompilerClient.hotReload(bundle, payload);
   }
 }

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "LynxFita Endogenous Cordis Runtime Spine",
+    "output": "cordis-spine.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "cordis-dma-path",
+        "label": "Cordis & DMA",
+        "focus": ["explorer", "router", "cordis", "dma", "ffi"],
+        "note": "Follow a Mini-App intent from the Explorer Super-App through Cordis Context into Stationary DMA and native FFI/WASI."
+      },
+      {
+        "id": "mtls-aot-path",
+        "label": "mTLS & Runtime AOT",
+        "focus": ["authority", "cordis", "compiler", "federation"],
+        "note": "Inspect certificate verification, CRL revocation rollback, and Runtime AOT bytecode compilation."
+      },
+      {
+        "id": "wire-gpu-path",
+        "label": "Protobuf & WebGPU",
+        "focus": ["router", "federation", "dma", "protobuf", "gpu"],
+        "note": "Trace zero-JSON binary framing and W3C WebGPU staging over Stationary DMA."
+      }
+    ]
+  },
+  "components": [
+    { "id": "explorer", "type": "frontend", "label": "Explorer Host", "sublabel": "Super-App Shell", "pos": [40, 300], "size": [120, 60] },
+    { "id": "authority", "type": "security", "label": "ctx.authority", "sublabel": "X.509 CA + CRL", "pos": [40, 110], "size": [120, 64], "tag": "node:tls mTLS" },
+    { "id": "router", "type": "frontend", "label": "ctx.router", "sublabel": "Mini-App Sandbox", "pos": [250, 300], "size": [130, 60] },
+    { "id": "cordis", "type": "backend", "label": "Cordis Context", "sublabel": "Static Hermes JSI", "pos": [460, 300], "size": [130, 60] },
+    { "id": "dma", "type": "database", "label": "ctx.dma", "sublabel": "64B Arena 0x2000", "pos": [670, 300], "size": [130, 60] },
+    { "id": "compiler", "type": "backend", "label": "ctx.compiler", "sublabel": "Runtime AOT .hbc", "pos": [670, 150], "size": [130, 60] },
+    { "id": "ffi", "type": "backend", "label": "ctx.ffi / wasi", "sublabel": ".dll / .so / .wasm", "pos": [880, 300], "size": [130, 60] },
+    { "id": "federation", "type": "cloud", "label": "ctx.federation", "sublabel": "Bundle Reconciler", "pos": [250, 440], "size": [130, 60], "tag": "HMR + OTA" },
+    { "id": "protobuf", "type": "messagebus", "label": "ctx.protobuf", "sublabel": "Binary Bridge", "pos": [670, 440], "size": [130, 60] },
+    { "id": "gpu", "type": "cloud", "label": "ctx.gpu", "sublabel": "WebGPU + WGSL", "pos": [880, 440], "size": [130, 60] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "LynxFita Native & TypeScript Cordis Runtime", "wraps": ["router", "cordis", "dma", "compiler", "ffi", "federation", "protobuf", "gpu"] },
+    { "kind": "security-group", "label": "Fiber Isolation & Revertible Effects", "wraps": ["cordis", "dma"] }
+  ],
+  "connections": [
+    { "id": "explorer-to-router", "from": "explorer", "to": "router", "label": "openSchema", "variant": "emphasis" },
+    { "id": "mtls-verify", "from": "authority", "to": "cordis", "label": "verify X.509", "variant": "security", "fromSide": "right", "toSide": "top", "via": [[525, 142]] },
+    { "id": "router-to-cordis", "from": "router", "to": "cordis" },
+    { "id": "bundle-reconcile", "from": "router", "to": "federation", "label": "reconcile", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelDy": 58 },
+    { "id": "cordis-to-dma", "from": "cordis", "to": "dma" },
+    { "id": "compile-hbc", "from": "dma", "to": "compiler", "label": "AOT .hbc", "fromSide": "top", "toSide": "bottom", "labelDy": -68 },
+    { "id": "dma-to-ffi", "from": "dma", "to": "ffi", "label": "SIMD" },
+    { "id": "wire-frame", "from": "dma", "to": "protobuf", "label": "frame", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelDy": 58 },
+    { "id": "protobuf-to-gpu", "from": "protobuf", "to": "gpu" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Super-App Shell", "items": ["Explorer launches isolated Mini-App Fibers via ctx.router", "ctx.federation reconciles embedded vs. remote OTA bundles"] },
+    { "dot": "emerald", "title": "Endogenous Spine", "items": ["All capabilities mount on Cordis Context with LIFO disposers", "64B Stationary DMA shared across C++20 FFI, WASI, and WebGPU"] },
+    { "dot": "rose", "title": "mTLS & Revocation", "items": ["node:tls X.509 client certs enforce RBAC channels", "Live CRL revocation triggers Fiber._unload() rollback"] }
+  ]
+}

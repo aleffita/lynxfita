@@ -33,6 +33,13 @@ export interface LocationErrorState {
   message?: string;
 }
 
+export type WeatherScreen =
+  | 'forecast-home'
+  | 'hourly-detail'
+  | 'city-search'
+  | 'shader-dma-inspector'
+  | 'location-error-boundary';
+
 export interface WeatherState {
   readonly location: WeatherLocation;
   readonly current: CurrentWeather;
@@ -46,9 +53,11 @@ export interface WeatherState {
   readonly dmaOffset: number;
   readonly lastSyncTimestamp: number;
   readonly isOfflineFallback: boolean;
+  readonly activeScreen: WeatherScreen;
 }
 
 export const INITIAL_WEATHER_STATE: WeatherState = {
+  activeScreen: 'forecast-home',
   location: {
     city: 'São Paulo',
     country: 'BR',

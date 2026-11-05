@@ -1,131 +1,76 @@
 ---
 type: protocol
 title: Master Agentry Protocol & Progressive Disclosure Indexer
-description: Authoritative master indexer and governance protocol for autonomous and human agents in the LynxFita research monorepo.
+description: Authoritative master indexer and governance protocol for autonomous and human agents in the LynxFita monorepo.
 tags:
   - agentry
   - protocol
   - progressive-disclosure
+  - cordis
   - governance
   - okf
-timestamp: 2026-11-04
+timestamp: 2026-11-05
 status: active
 author: aleffita
 ---
 
 # LynxFita Master Agentry Protocol
 
-> [!IMPORTANT]
-> This file is the primary entrypoint for any agent (autonomous, pair programmer, or human researcher) operating within the LynxFita ecosystem. It establishes operational boundaries, routing indexers, and non-negotiable scientific invariants.
+LynxFita is an all-plugin, Cordis-powered ([`vendor/cordis`](file:///j:/limiar/packages/lynxfita/vendor/cordis), [arXiv:2608.25512](https://arxiv.org/abs/2608.25512)) native desktop and embedded runtime for LynxJS built on Static Hermes (`static_h`), C++20 JSI, WIT/WASI components, Stationary DMA, and X.509 mTLS Module Federation.
 
 ---
 
 ## 1. Progressive Disclosure Architecture
 
-To protect working memory and eliminate token bloat, agentry governance is modularized by domain. Agents MUST NOT dump monolithic rules into chat or maintain giant append-only documents. Consult domain indexers as tasks cross boundaries:
+Governance is modularized by subtree. Consult the owning `AGENTS.md` before modifying any directory:
 
 ```
-[Repository Root] AGENTS.md (Master Indexer & Core Invariants)
+[Repository Root] AGENTS.md (Standing Orders & Capability Seam Contract)
        │
-       ├── docs/AGENTS.md (Epistemology, OKF Standards, Insights & Living Glossary)
-       ├── packages/AGENTS.md (TypeScript Workspaces, JSI Codegen & WASI Host Context)
-       ├── src/native/AGENTS.md (C++20 JSI Adapter, Static Hermes & Sandboxed WASI)
+       ├── docs/AGENTS.md (Tier Taxonomy, dsh-prose-standard, Archify Diagrams & OKF)
+       ├── packages/AGENTS.md (Cordis Capability Seams, WIT Codegen, Builder & mTLS Updater)
+       ├── src/native/AGENTS.md (C++20 NativeContext, Dynamic .dll/.so/.dylib Loader & DMA Arena)
        ├── vendor/AGENTS.md (Zero-Fork Pinned Submodules & Atomic Patch Manager)
-       └── .agents/ (Domain Specialist Subagents & Executable Skills)
+       ├── benchmarks/AGENTS.md (Kalibera & Jones Statistical Benchmarking Methodology)
+       ├── examples/AGENTS.md (Multi-Platform LynxFita Explorer & Weather Showcase MVI)
+       └── .agents/ (Specialist Profiles & Executable Skills: archify, dsh-prose-standard, record-browser-gif)
 ```
 
-### Domain Routing Matrix
-
-| Domain | Governance Scope | Authoritative Indexer |
+| Subtree | Governance Scope | Authoritative Indexer |
 | :--- | :--- | :--- |
-| **Research & Docs** | Epistemic ontology, YAML frontmatter schemas, verbatim transcripts | [`docs/AGENTS.md`](file:///j:/limiar/packages/lynxfita/docs/AGENTS.md) |
-| **TypeScript Runtime** | `@lynxfita/core`, `@lynxfita/codegen`, `@lynxfita/wasi-runtime` | [`packages/AGENTS.md`](file:///j:/limiar/packages/lynxfita/packages/AGENTS.md) |
-| **Native C++ Engine** | Modern C++20 JSI adapter, `HostObject`, MSVC/CMake/Ninja pipelines | [`src/native/AGENTS.md`](file:///j:/limiar/packages/lynxfita/src/native/AGENTS.md) |
-| **Vendor Submodules** | Upstream synchronization, zero-fork tracking, atomic `.patch` flow | [`vendor/AGENTS.md`](file:///j:/limiar/packages/lynxfita/vendor/AGENTS.md) |
-| **Specialist Profiles** | Runtime Specialist, Desktop Architect, Protocol Governor, Docs Curator | [`.agents/`](file:///j:/limiar/packages/lynxfita/.agents) |
-| **Executable Skills** | Submodule patching, native test runner, codegen, ontology sync | [`.agents/skills/`](file:///j:/limiar/packages/lynxfita/.agents/skills) |
+| **Documentation & Prose** | Tier taxonomy, `dsh-prose-standard`, Archify specs, transcripts | [`docs/AGENTS.md`](file:///j:/limiar/packages/lynxfita/docs/AGENTS.md) |
+| **TypeScript Workspaces** | `@lynxfita/core`, `codegen`, `wasi-runtime`, `builder`, `updater`, `cli` | [`packages/AGENTS.md`](file:///j:/limiar/packages/lynxfita/packages/AGENTS.md) |
+| **Native C++20 Engine** | `NativeContext`, `LoadLibraryExW`/`dlopen` FFI, Stationary DMA, Static Hermes | [`src/native/AGENTS.md`](file:///j:/limiar/packages/lynxfita/src/native/AGENTS.md) |
+| **Vendor Submodules** | 10 pinned upstream submodules (`cordis`, `hermes`, `lynx`, `kernels`, etc.) | [`vendor/AGENTS.md`](file:///j:/limiar/packages/lynxfita/vendor/AGENTS.md) |
+| **Statistical Benchmarks** | Warm-up convergence, $N \ge 30$ samples, $p50/p95/p99$, IQR, CV%, 95% CI | [`benchmarks/AGENTS.md`](file:///j:/limiar/packages/lynxfita/benchmarks/AGENTS.md) |
+| **Explorer & Examples** | Super-App `examples/explorer/`, `weather-showcase`, HMR & FFmpeg capture | [`examples/AGENTS.md`](file:///j:/limiar/packages/lynxfita/examples/AGENTS.md) |
+| **Skills & Profiles** | `archify`, `dsh-prose-standard`, `record-browser-gif`, `codegen-jsi`, `native-build-test` | [`.agents/`](file:///j:/limiar/packages/lynxfita/.agents) |
 
 ---
 
-## 2. Core Operational Invariants
+## 2. Core Engineering & Architectural Invariants
 
-### A. Zero Polling and Respect for Long-Running Tasks
-- **NEVER** poll running processes or tasks.
-- Computing tasks, builds, and test runs take time; trust the harness and rely on **Reactive Wakeup**.
-- End turns cleanly when tasks run in the background.
+### A. Everything Is a Cordis Plugin (Endogenous Runtime Spine)
+- Following [`aleffita/deepseek-harness`](https://github.com/aleffita/deepseek-harness) and [`vendor/cordis`](file:///j:/limiar/packages/lynxfita/vendor/cordis), every runtime capability is a **Capability Seam** comprising a **Service Definition**, **Service Provider**, and **Consumer** mounted on a unified `Context` (`LynxFitaContext` in TypeScript and `lynxfita::cordis::NativeContext` in C++20):
+  - `ctx.dma`: 64B-aligned Stationary DMA arena + PPE/SPE ring lanes + SIMD reductions.
+  - `ctx.protobuf`: Zero-JSON binary wire framing over `ctx.dma`.
+  - `ctx.compiler`: Static Hermes ahead-of-time (`.hbc`) and runtime JIT/AOT compiler.
+  - `ctx.ffi`: Cross-platform dynamic native library loader (`.dll` via `LoadLibraryExW`, `.so`/`.dylib` via `dlopen`) with automatic `FreeLibrary`/`dlclose` on Fiber `_unload()`.
+  - `ctx.wasi`: WIT (WebAssembly Interface Types) universal module IR and sandboxed WASI host bound to `ctx.dma`.
+  - `ctx.gpu`: W3C WebGPU two-buffer staging + WGSL compute shaders + `huggingface/kernels`.
+  - `ctx.authority`: Real `node:tls` X.509 mTLS Authority Server (`requestCert: true`), role-bearing client certificates (`viewer`, `top-patron`, `canary`), and live Certificate Revocation List (CRL).
+  - `ctx.federation`: Bundler Module Federation & OTA reconciler (embedded installation bundle vs. remote federated bundle) with live certificate revocation rollback (`Fiber._unload()`).
+- **Registrations Are Revertible Effects**: Every resource registration goes through `ctx.effect()` or generator `yield` and returns a disposer so reload and teardown unwind in LIFO order.
 
-### B. Strict Sequential Execution & Single Atomic Commands
-- **NEVER** chain commands with semicolons (`;`), logical operators (`&&`, `||`), or multi-step scratch scripts.
-- Execute one atomic command at a time, synchronously, inspecting each output before proceeding.
+### B. Zero Polling, Single Atomic Commands & Anti-Reward-Hacking
+- **Zero Polling**: Never poll background tasks or subagents; rely strictly on Reactive Wakeup.
+- **Single Atomic Commands**: Never chain shell commands with `;`, `&&`, or `||`.
+- **Zero Mocks / Zero Reward Hacking**: Never fake mTLS/RBAC with string tokens (`MTLS_AUTH_TOKEN_...`), never hardcode benchmark results, and never weaken test assertions.
 
-### C. Absolute Anti-Reward-Hacking Directive
-- **NEVER** hardcode static lookup tables, pattern-matching databases, or mock answers to pass benchmarks or tests.
-- **NEVER** weaken, skip, or delete assertions to fake verification.
-- Benchmarks and test suites are diagnostic instruments; report raw empirical numbers plainly.
+### C. DeepSeek-Harness Prose Standard (`dsh-prose-standard`) & Visual Evidence
+- Write direct, factual contracts using [`dsh-prose-standard`](file:///j:/limiar/packages/lynxfita/.agents/skills/dsh-prose-standard/SKILL.md). Never use AI-slop buzzwords (`"industrial port"`, `"v2.0 Architecture"`, `"advance the frontier"`, `"state-of-the-art"`).
+- Compile all architecture and sequence diagrams via [`archify`](file:///j:/limiar/packages/lynxfita/.agents/skills/archify/SKILL.md) (`.agents/skills/archify/SKILL.md`) and record all UI demos from live browser execution via [`record-browser-gif`](file:///j:/limiar/packages/lynxfita/.agents/skills/record-browser-gif/SKILL.md) + FFmpeg.
 
-### D. Principal Feedback Ingestion Directive (Zero Anthropomorphism)
-- When principal feedback is received:
-  1. **Zero Flattery / Zero Debate**: Never output apologies, self-deprecation, or performative agreements/disagreements.
-  2. **Silent Ingestion**: Incorporate feedback directly into persistent behavioral directives and system code.
-  3. **Ontological & Epistemic Alignment**: Update [`docs/glossary.md`](file:///j:/limiar/packages/lynxfita/docs/glossary.md) and concept documents when new terminology or perspective shifts are introduced.
-
-### E. Fiduciary Responsibility & Elevation Scoping
-- Elevation (UAC) is reserved strictly for operations requiring administrative tokens (e.g., driver configuration, system installations).
-- Never elevate for operations achievable within user space.
-- Physical handovers (reboots, hardware reconnection, external 2FA) must be cleanly surrendered to the human principal.
-
-### F. Epistemic Feedback Decoupage & Anti-Premature Ingestion
-- When receiving feedback dumps from the principal, **NEVER** start assembling a task list prematurely while reading early sentences.
-- The principal is Twice-Exceptional (2e) with non-linear, topological thinking. Ingest the entire text verbatim into `docs/transcripts/`, synthesize dialectically, cross-reference empirical sources, and only then derive atomic execution tasks.
-
-### G. Stationary Memory & DMA Lanes (CBE EIB Paradigm)
-- Treat memory hierarchically and heterogeneously, inspired by the Cell Broadband Engine (CBE) Element Interconnect Bus (EIB).
-- Pre-allocate stationary pinned buffers and communicate across PPE (Host) and SPE (Worker) lanes via bidirectional DMA rings and SIMD vector packing, eliminating Von Neumann bus saturation and redundant JSON allocations.
-
-### H. Zero-GIL Multithreading & Non-Colored Coroutines
-- Concurrency must not force function coloring (red/blue async functions) or Global Interpreter Lock (GIL) contention.
-- Utilize native fiber coroutines with iterator/`yield` scheduling executed on native background threads with lockless ring buffers.
-
-### I. Spatiotemporal Composability & Dynamic Plugin Ledgers (CORDIS)
-- Adopt the CORDIS paradigm: temporal composability via revertible effects (state rollback on deactivation) and spatial composability via reactive coeffects (contextual activation).
-- Manage plugins and bundles via a deterministic dependency ledger with hot module reloading.
-
-### J. Public Presentation, Retention & SEO
-- Landing pages (`README.md`) must be clean, elegant, high-retention, and SEO-friendly.
-- **NEVER** dump gigantic, unstyled diagrams onto the main README. Isolate in-depth technical diagrams in dedicated `docs/architecture/` artifacts with proper styling and direct links.
-
-### K. Coordinator Ultimate Liability & Pre-Delegation Dialectical Synthesis
-- **Strict Command Chain Accountability**: The Principal Coordinator (lead agent) bears **100% of the responsibility** for every action, commit, pipeline trigger, and architectural decision executed by any subagent. If a subagent makes an error, violates Gitflow, or delivers shallow work, the entire team fails and the fault lies squarely on the Coordinator.
-- **Zero Blind Forwarding**: The Coordinator MUST NEVER blindly forward a raw user prompt to a worker subagent to "do everything at once".
-- **Mandatory Multi-Turn Orchestration**: Before delegating implementation:
-  1. The Coordinator must personally perform deep epistemological decoupage and structural analysis of the principal's request.
-  2. Dispatch targeted, read-only reconnaissance/verification tasks to subagents first to gather empirical facts.
-  3. Reflect on the findings, design the exact architectural specification, branch strategy, and verification gates.
-  4. Delegate scoped, atomic work packages on isolated feature branches (`feature/*`) and personally audit every diff and CI status before any merge into `develop` or `main`.
-  5. **Mandatory Adversarial Peer-Review Gate**: Every Pull Request opened by an implementation subagent MUST undergo an independent line-by-line code review by a verification subagent (`DeepInvestigator`) checking for hardcodes, simplifications, mocks, or untested paths *before* the Coordinator authorizes merging.
-
-### L. Strict Gitflow & CI/CD Pipeline Discipline (Zero Trunk-Based Spam)
-- **Absolute Prohibition of Direct Pushes to `main`**: Agents MUST NEVER push commits directly to `main` (trunk-based commits) or trigger multiple uncoordinated CI/CD runs.
-- **Gitflow Branch Hierarchy**:
-  - `main`: Production-grade, tagged SemVer releases only (`vX.Y.Z`).
-  - `develop`: Integration branch receiving reviewed Pull Requests.
-  - `feature/*`, `fix/*`, `release/*`: Working branches where all local commits and local test validations occur *before* a single push.
-- **Issue-to-PR Traceability & Zero Stale Issues**: Every feature or fix MUST map to a tracked GitHub Issue (with labels and milestone), and its Pull Request body MUST include explicit GitHub closing keywords (`Closes #N` / `Resolves #N`) so merging the PR automatically resolves and links the Issue. Never leave disconnected or stale Issues open.
-- **Dead Branch Pruning & Auto-Delete on Merge**: The repository setting `delete_branch_on_merge` MUST be enforced (`true`), and merged `feature/*`, `fix/*`, and `release/*` branches MUST be deleted immediately after merge both locally (`git branch -d`) and on `origin` (`git push origin --delete` / `gh pr merge --delete-branch`). Never leave dead branches lingering in the repository.
-- **Git Worktree Orchestration**: Parallel feature streams MUST use isolated Git worktrees (`git worktree`) or branched workspaces to prevent index locks and cross-branch contamination.
-- **Changelog Maintenance**: Every release cycle MUST update [`CHANGELOG.md`](file:///j:/limiar/packages/lynxfita/CHANGELOG.md) with structured SemVer release notes.
-- **CI/CD Concurrency & Gatekeeping**: All GitHub Actions workflows MUST enforce `concurrency` cancellation (`cancel-in-progress: true`), path filtering, and strict PR status checks prior to merge.
-
-### M. Releases vs. Packages Distribution Taxonomy
-- **GitHub Releases (Multi-Platform Binaries & App Executables)**: Distributes compiled native engine binaries, C++20 headers, and standalone multi-platform application executables (Windows x64, Linux x64, macOS arm64) with cryptographic SHA-256 manifests.
-- **GitHub Packages (Modular SDK & OTA AOT Bundles)**: Distributes versioned npm workspace packages (`@aleffita/*` on `npm.pkg.github.com`) and signed Over-The-Air (OTA) AOT application bundles consumed directly by `@lynxfita/updater` without requiring binary reinstallation.
-
----
-
-## 3. Subagent Specialization Roster
-
-Subagent operational profiles reside in [`.agents/`]:
-- [`runtime-specialist.md`](file:///j:/limiar/packages/lynxfita/.agents/runtime-specialist.md): Static Hermes AOT, JSI interfaces, memory bounds, bytecode verification.
-- [`desktop-architect.md`](file:///j:/limiar/packages/lynxfita/.agents/desktop-architect.md): Win32 native embedding, Lynxtron shell dichotomy, Chromium GN ninja build hooks.
-- [`protocol-governor.md`](file:///j:/limiar/packages/lynxfita/.agents/protocol-governor.md): Epistemic taxonomy, anti-reward-hacking audits, multi-agent coordination governance.
-- [`docs-curator.md`](file:///j:/limiar/packages/lynxfita/.agents/docs-curator.md): Open Knowledge Format (OKF) compliance, living glossary synchronization.
+### D. Coordinator Ultimate Liability & Strict Gitflow
+- The Principal Coordinator bears 100% liability for all subagent actions, diffs, and CI gates.
+- All changes flow through tracked GitHub Issues (`Closes #N`) on `feature/*` or `fix/*` branches into `develop` and `main`, with mandatory adversarial review (`CordisAdversarialAuditor`) and immediate dead-branch deletion (`delete_branch_on_merge = true`).

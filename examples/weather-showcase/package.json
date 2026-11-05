@@ -1,6 +1,6 @@
 {
   "name": "@lynxfita/example-weather-showcase",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "private": true,
   "description": "Port MVI of aleffita/weather-showcase with WebGPU/WGSL atmospheric shaders and Stationary DMA telemetry",
   "type": "module",
@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "pretest": "tsc",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
     "start": "node dist/index.js"
   }
 }

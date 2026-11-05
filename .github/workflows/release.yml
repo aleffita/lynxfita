@@ -39,7 +39,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -62,27 +62,16 @@ jobs:
         run: pnpm install --frozen-lockfile=false
 
       - name: Setup Workspace Module Proxies
-        run: node scripts/setup-workspace.mjs
+        run: node --experimental-strip-types scripts/setup-workspace.ts
 
-      - name: Build Core Runtime Package
-        run: pnpm --filter "@lynxfita/core" run build
+      - name: Build All Monorepo Packages
+        run: pnpm -r run build
 
-      - name: Build TypeScript Packages
-        run: |
-          pnpm --filter "@lynxfita/codegen" run build
-          pnpm --filter "@lynxfita/builder" run build
-          pnpm --filter "@lynxfita/wasi-runtime" run build
-          pnpm --filter "@lynxfita/updater" run build
-          pnpm --filter "@lynxfita/cli" run build
-
-      - name: Build Example Packages
-        run: |
-          pnpm --filter "@lynxfita/example-weather-showcase" run build
-          pnpm --filter "desktop-hermes-app" run build
-          pnpm --filter "super-app" run build
+      - name: Install Playwright Chromium & FFmpeg for E2E Browser Tests
+        run: pnpm exec playwright-core install chromium ffmpeg
 
       - name: Run Tests
-        run: pnpm -r run test
+        run: pnpm test
 
       - name: Configure CMake Native
         run: cmake -B build/native -S src/native -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -94,9 +83,9 @@ jobs:
         run: |
           ${{ runner.os == 'Windows' && 'build\\native\\lynxfita_native_tests.exe' || './build/native/lynxfita_native_tests' }}
 
-      - name: Verify Standalone lynxfita_explorer
+      - name: Verify Standalone lynxfita_explorer Navigation Lifecycle
         run: |
-          ${{ runner.os == 'Windows' && 'build\\native\\lynxfita_explorer.exe --version' || './build/native/lynxfita_explorer --version' }}
+          ${{ runner.os == 'Windows' && 'build\\native\\lynxfita_explorer.exe --verify-navigation' || './build/native/lynxfita_explorer --verify-navigation' }}
 
       - name: Package Windows Artifacts
         if: runner.os == 'Windows'
@@ -106,9 +95,8 @@ jobs:
           New-Item -ItemType Directory -Path dist/artifacts -Force
           Copy-Item -Path build/native/lynxfita_explorer.exe -Destination dist/staging/
           Copy-Item -Path build/native/lynxfita_native_tests.exe -Destination dist/staging/
+          Copy-Item -Path build/native/lynxfita_weather_simd_plugin.dll -Destination dist/staging/ -ErrorAction SilentlyContinue
           Copy-Item -Path build/native/lynxfita_native.lib -Destination dist/staging/
-          Copy-Item -Path examples/super-app/dist/*.hbc -Destination dist/staging/ -ErrorAction SilentlyContinue
-          Copy-Item -Path examples/weather-showcase/dist/*.hbc -Destination dist/staging/ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist/staging/* -DestinationPath dist/artifacts/lynxfita-windows-x64-${{ github.ref_name }}.zip
           Compress-Archive -Path src/native/include/* -DestinationPath dist/artifacts/lynxfita-native-headers.zip
 
@@ -119,8 +107,8 @@ jobs:
           mkdir -p dist/staging dist/artifacts
           cp build/native/lynxfita_explorer dist/staging/
           cp build/native/lynxfita_native_tests dist/staging/
+          cp build/native/lynxfita_weather_simd_plugin.* dist/staging/ 2>/dev/null || true
           cp build/native/liblynxfita_native.a dist/staging/ 2>/dev/null || true
-          cp examples/*/*/dist/*.hbc dist/staging/ 2>/dev/null || true
           tar -czvf "dist/artifacts/lynxfita-${{ matrix.platform }}-${{ github.ref_name }}.tar.gz" -C dist/staging .
 
       - name: Upload Platform Artifacts
@@ -172,7 +160,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           registry-url: 'https://npm.pkg.github.com'
           scope: '@aleffita'
 
@@ -185,19 +173,10 @@ jobs:
         run: pnpm install --frozen-lockfile=false
 
       - name: Setup Workspace Module Proxies
-        run: node scripts/setup-workspace.mjs
+        run: node --experimental-strip-types scripts/setup-workspace.ts
 
       - name: Build Monorepo Packages
-        run: |
-          pnpm --filter "@lynxfita/core" run build
-          pnpm --filter "@lynxfita/codegen" run build
-          pnpm --filter "@lynxfita/builder" run build
-          pnpm --filter "@lynxfita/wasi-runtime" run build
-          pnpm --filter "@lynxfita/updater" run build
-          pnpm --filter "@lynxfita/cli" run build
-          pnpm --filter "@lynxfita/example-weather-showcase" run build
-          pnpm --filter "desktop-hermes-app" run build
-          pnpm --filter "super-app" run build
+        run: pnpm -r run build
 
       - name: Publish Scoped npm Packages to GitHub Packages
         run: |
@@ -227,26 +206,16 @@ jobs:
             fs.writeFileSync(path, JSON.stringify(p, null, 2));
           "
           npm publish ./examples/weather-showcase --no-git-checks --provenance=false || echo "Package already published or warning"
+          echo "Publishing @aleffita/lynxfita-explorer..."
+          node -e "
+            const fs = require('fs');
+            const path = './examples/explorer/package.json';
+            const p = JSON.parse(fs.readFileSync(path, 'utf8'));
+            p.name = '@aleffita/lynxfita-explorer';
+            p.version = '${{ github.ref_name }}'.replace(/^v/, '');
+            p.publishConfig = { registry: 'https://npm.pkg.github.com/' };
+            fs.writeFileSync(path, JSON.stringify(p, null, 2));
+          "
+          npm publish ./examples/explorer --no-git-checks --provenance=false || echo "Package already published or warning"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  publish-container-package:
-    name: Build & Push GHCR Package
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Build and Push Docker image
-        run: |
-          IMAGE_ID=ghcr.io/${{ github.repository }}
-          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-          VERSION=${{ github.ref_name }}
-          echo "Building and pushing $IMAGE_ID:$VERSION and $IMAGE_ID:latest"
-          docker build . -t $IMAGE_ID:$VERSION -t $IMAGE_ID:latest
-          docker push $IMAGE_ID:$VERSION
-          docker push $IMAGE_ID:latest

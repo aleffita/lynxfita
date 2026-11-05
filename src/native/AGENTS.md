@@ -1,36 +1,35 @@
 ---
 type: protocol
-title: Native C++ Engine Domain Agentry Indexer
-description: Governance, build standards, and verification protocols for LynxFita's native C++20 JSI adapter and WASI host layer.
+title: "AGENTS.md — Native C++20 Engine, Dynamic Shared Libraries & Static Hermes"
+description: "Governance rules for C++20 native runtime components, NativeContext Cordis spine, LoadLibraryExW/dlopen FFI, and Stationary DMA."
 tags:
-  - agentry
   - native
   - cpp20
-  - jsi
-  - indexer
-timestamp: 2026-11-04
+  - cordis
+  - static-hermes
+  - dynamic-library
+  - dma
+timestamp: 2026-11-05
 status: active
 author: aleffita
 ---
 
-# Native C++ Engine Domain Agentry Indexer
+# AGENTS.md — Native C++20 Engine (`src/native/`)
 
-## 1. Domain Governance
-This domain contains the high-performance native C++20 layer bridging JavaScript engines (Hermes StaticH, PrimJS) and native platform APIs.
+This directory contains the C++20 native runtime engine (`lynxfita_native_core`), the dynamically loaded shared library plugin (`lynxfita_weather_simd_plugin` `.dll`/`.so`/`.dylib`), the multi-platform native host (`lynxfita_explorer`), and the C++20 verification and benchmark binaries (`lynxfita_native_tests`, `lynxfita_bench`).
 
-### Component Structure
-- [`src/native/include/lynxfita/`](file:///j:/limiar/packages/lynxfita/src/native/include/lynxfita):
-  - `jsi_types.h`: `HostObject`, `JsiValueVariant`, `StatusCode`, `ExecutionResult`, and `JsiValueToString`.
-  - `hermes_runtime_adapter.h`: Hermes AOT/JIT lifecycle and bytecode verification (`\x1fHBC`).
-  - `legacy_bridge_interceptor.h`: Coexistence bridge sequestrator intercepting `spkPipe` with `std::shared_mutex` concurrency protection.
-  - `wasi_host_module.h`: Sandboxed WASI host module with linear memory bounds enforcement (`WriteMemory`, `ReadMemory`, `GrowMemory`).
-- [`src/native/include/lynxfita/generated/`](file:///j:/limiar/packages/lynxfita/src/native/include/lynxfita/generated):
-  - Auto-generated C++ spec headers output by `@lynxfita/codegen`.
-- [`src/native/tests/test_runner.cc`](file:///j:/limiar/packages/lynxfita/src/native/tests/test_runner.cc):
-  - Test runner verifying runtime initialization, generated spec compilation, WASI memory boundaries, JSI vs JSON benchmarks, and multithreaded mutation safety.
+## Core Native Subsystems
 
-## 2. Invariants for Native Developers
-1. **Modern C++20 Standard**: Compile with `set(CMAKE_CXX_STANDARD 20)` under MSVC (VS 2026 Developer Command Prompt) + Ninja.
-2. **Deterministic Memory Safety**: All linear memory accesses must be bounds-checked against `capabilities_.memory_limit_bytes`.
-3. **Thread Safety**: Any mutable registry accessed across JSI calls must be protected with reader/writer locks (`std::shared_mutex`).
-4. **Comprehensive Variant Serialization**: Ensure all `JsiValueVariant` types (`double`, `int64_t`, `bool`, `string`, `vector<uint8_t>`) are serialized via `JsiValueToString`.
+1. **`lynxfita::cordis::NativeContext` (`cordis_native_context.h` / `.cc`)**:
+   - Native C++20 realization of the Cordis `Context` and `Fiber` lifecycle (arXiv:2608.25512) inside the Static Hermes / JSI runtime.
+   - Tracks native service registrations (`dma`, `protobuf`, `compiler`, `ffi`, `wasi`) and executes LIFO disposers when a Fiber unloads.
+2. **Cross-Platform Dynamic Native Library Loader (`native_ffi_loader.h` / `.cc`)**:
+   - Supersedes `vendor/lynx/explorer/cpp/LynxNodeAPI.cc`.
+   - Loads `.dll` via `LoadLibraryExW` / `GetProcAddress` on Windows and `.so` / `.dylib` via `dlopen` / `dlsym` on Linux/macOS/Android.
+   - Binds exported C ABI plugin functions directly to Stationary DMA slots (`0x2000`) and invokes `FreeLibrary` / `dlclose` automatically when the owning Cordis Fiber unloads.
+3. **Stationary DMA Arena & SIMD (`dma_eib_engine.h` / `.cc`)**:
+   - 64-byte cache-line aligned stationary memory (`_aligned_malloc` / `std::aligned_alloc`), lock-free SPSC ring lanes, and SSE/AVX/NEON vector reductions.
+4. **Native Coroutine Scheduler (`coroutine_scheduler.h` / `.cc`)**:
+   - C++20 `<coroutine>` symmetric/yieldable fibers scheduled without GIL contention.
+5. **Static Hermes AOT/JIT Adapter (`hermes_runtime_adapter.cc`, `hermes_compiler.cc`)**:
+   - Verifies `.hbc` headers, SHA-256 digests, and Ed25519 signatures, and supports runtime bytecode compilation for federated OTA bundles.

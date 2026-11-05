@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -33,36 +33,25 @@ jobs:
         run: pnpm install --frozen-lockfile=false
 
       - name: Setup Workspace Module Proxies
-        run: node scripts/setup-workspace.mjs
+        run: node --experimental-strip-types scripts/setup-workspace.ts
 
-      - name: Build Core Runtime Package
-        run: pnpm --filter "@lynxfita/core" run build
+      - name: Verify Anti-Slop & Documentation Gates
+        run: pnpm run verify:docs
 
-      - name: Build TypeScript Packages
-        run: |
-          pnpm --filter "@lynxfita/codegen" run build
-          pnpm --filter "@lynxfita/builder" run build
-          pnpm --filter "@lynxfita/wasi-runtime" run build
-          pnpm --filter "@lynxfita/updater" run build
-          pnpm --filter "@lynxfita/cli" run build
+      - name: Build All Monorepo Packages
+        run: pnpm -r run build
 
-      - name: Build Example Packages
-        run: |
-          pnpm --filter "@lynxfita/example-weather-showcase" run build
-          pnpm --filter "desktop-hermes-app" run build
-          pnpm --filter "super-app" run build
+      - name: Install Playwright Chromium & FFmpeg for E2E Browser Tests
+        run: pnpm exec playwright-core install chromium ffmpeg
 
-      - name: Run Package Tests
-        run: pnpm -r run test
+      - name: Run Workspace Tests
+        run: pnpm test
 
-      - name: Run Integration Tests
-        run: pnpm run test:integration
-
-      - name: Run E2E Tests
-        run: pnpm run test:e2e
+      - name: Run Statistical Benchmarks
+        run: pnpm run bench
 
       - name: Verify Vendor Submodules
-        run: node scripts/vendor-sync.mjs --verify
+        run: node --experimental-strip-types scripts/vendor-sync.ts --verify
 
   native-windows:
     name: Native C++20 (Windows MSVC)
@@ -84,8 +73,8 @@ jobs:
       - name: Run Native Unit Tests
         run: build\native\lynxfita_native_tests.exe
 
-      - name: Verify Standalone lynxfita_explorer Executable
-        run: build\native\lynxfita_explorer.exe --version
+      - name: Verify Standalone lynxfita_explorer Navigation Lifecycle
+        run: build\native\lynxfita_explorer.exe --verify-navigation
 
   native-posix:
     name: Native C++20 (Linux GCC/Clang POSIX)
@@ -107,5 +96,27 @@ jobs:
       - name: Run Native Unit Tests
         run: ./build/native/lynxfita_native_tests
 
-      - name: Verify Standalone lynxfita_explorer Executable
-        run: ./build/native/lynxfita_explorer --version
+      - name: Verify Standalone lynxfita_explorer Navigation Lifecycle
+        run: ./build/native/lynxfita_explorer --verify-navigation
+
+      - name: Setup Node.js (POSIX Validation)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.5.1
+
+      - name: Install Node Dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Setup Workspace Module Proxies
+        run: node --experimental-strip-types scripts/setup-workspace.ts
+
+      - name: Build All Monorepo Packages
+        run: pnpm -r run build
+
+      - name: Run Cross-Platform Node Unit & Integration Tests (POSIX)
+        run: pnpm run test:unit && pnpm run test:integration
