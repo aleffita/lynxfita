@@ -1,6 +1,6 @@
 {
   "name": "@lynxfita/codegen",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "LynxFita Codegen: Type-safe C++ JSI HostObject and TypeScript binding generator for native modules",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

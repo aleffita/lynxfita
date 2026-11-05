@@ -1,125 +1,133 @@
 /**
- * LynxFita Updater: Real X.509 mTLS Authority & Module Federation Tests
+ * LynxFita Updater: Ed25519 Release Integrity & Module Federation Tests
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { X509Certificate } from 'node:crypto';
 import { LynxFitaContext, CompilerService } from '@lynxfita/core';
 import {
-  generateEcKeyPair,
-  createX509Certificate,
-  CertificateRevocationList,
-  MtlsRbacLedger,
-  AuthorityService,
-  FederationService
+  generateReleaseKeyPair,
+  signPayload,
+  verifyPayload,
+  computeSha256,
+  FederationService,
+  GitHubReleasesUpdater,
+  type FederatedBundle,
 } from '../dist/index.js';
 
-test('Authentic X.509 Certificate generation and native verification', () => {
-  const rootKp = generateEcKeyPair();
-  const rootCa = createX509Certificate({
-    subjectCn: 'LynxFita Test Root CA',
-    issuerCn: 'LynxFita Test Root CA',
-    publicKey: rootKp.publicKey,
-    signingPrivateKey: rootKp.privateKey,
-    serialNumber: 1,
-    role: 'root'
-  });
+test('Ed25519 key generation, cryptographic signing and verification', () => {
+  const keyPair = generateReleaseKeyPair();
+  assert.ok(keyPair.publicKeyPem.includes('BEGIN PUBLIC KEY'));
+  assert.ok(keyPair.privateKeyPem.includes('BEGIN PRIVATE KEY'));
 
-  const rootCert = new X509Certificate(rootCa.pem);
-  assert.equal(rootCert.subject, 'CN=LynxFita Test Root CA');
-  assert.equal(rootCert.issuer, 'CN=LynxFita Test Root CA');
+  const payload = 'LynxFita Release v2.1.0 Payload Content';
+  const sig = signPayload(payload, keyPair.privateKeyPem);
+  assert.ok(sig.length > 0);
 
-  const clientKp = generateEcKeyPair();
-  const clientCertBundle = createX509Certificate({
-    subjectCn: 'LynxFita Top-Patron Client',
-    issuerCn: 'LynxFita Test Root CA',
-    publicKey: clientKp.publicKey,
-    signingPrivateKey: rootKp.privateKey,
-    serialNumber: 202,
-    role: 'top-patron'
-  });
+  // Valid signature verification
+  const isValid = verifyPayload(payload, sig, keyPair.publicKeyPem);
+  assert.equal(isValid, true);
 
-  const clientCert = new X509Certificate(clientCertBundle.pem);
-  assert.equal(clientCert.subject, 'CN=LynxFita Top-Patron Client');
-  assert.equal(clientCert.issuer, 'CN=LynxFita Test Root CA');
+  // Tampered payload fails verification
+  const tamperedPayload = 'LynxFita Release v2.1.0 TAMPERED Content';
+  const isTamperedValid = verifyPayload(tamperedPayload, sig, keyPair.publicKeyPem);
+  assert.equal(isTamperedValid, false);
 
-  // Verify signature cryptographically using Root CA public key
-  const valid = clientCert.verify(rootCert.publicKey);
-  assert.equal(valid, true);
+  // Tampered signature fails verification
+  const badSig = '00'.repeat(sig.length / 2);
+  const isBadSigValid = verifyPayload(payload, badSig, keyPair.publicKeyPem);
+  assert.equal(isBadSigValid, false);
 });
 
-test('CertificateRevocationList revocation and serial verification', () => {
-  const crl = new CertificateRevocationList();
-  const serial1 = '0123456789ABCDEF';
-  const serial2 = 'FEDCBA9876543210';
+test('SHA-256 payload integrity computation and asset verification', () => {
+  const data = new TextEncoder().encode('Hello LynxFita Stationary DMA');
+  const hash = computeSha256(data);
+  assert.equal(hash.length, 64);
 
-  assert.equal(crl.isRevoked(serial1), false);
-  assert.equal(crl.isRevoked(serial2), false);
-
-  crl.revoke(serial1);
-  assert.equal(crl.isRevoked(serial1), true);
-  assert.equal(crl.isRevoked(serial2), false);
-  assert.equal(crl.getRevokedCount(), 1);
+  const updater = new GitHubReleasesUpdater();
+  assert.equal(updater.verifyDownloadedAsset(data, hash), true);
+  assert.equal(updater.verifyDownloadedAsset(data, 'f'.repeat(64)), false);
+  assert.equal(updater.verifyDownloadedAsset(data, 'short-invalid'), false);
 });
 
-test('MtlsRbacLedger cryptographic ledger chain and Ed25519 signatures', () => {
-  const ledger = new MtlsRbacLedger();
-
-  const cert1 = ledger.issueCertificate('device-alpha', 'hw-seed-1234', ['viewer']);
-  assert.equal(cert1.deviceId, 'device-alpha');
-  assert.ok(cert1.chainSignature.length > 0);
-  assert.deepEqual(cert1.roles, ['viewer']);
-
-  const cert2 = ledger.issueCertificate('device-beta', 'hw-seed-5678', ['top-patron', 'canary']);
-  assert.equal(cert2.deviceId, 'device-beta');
-  assert.deepEqual(cert2.roles, ['top-patron', 'canary']);
-
-  // Verify full SHA-256 block chain and Ed25519 signatures
-  const chainValid = ledger.verifyLedgerChainIntegrity();
-  assert.equal(chainValid, true);
-});
-
-test('AuthorityService mTLS server and client certificate verification', async () => {
-  const ctx = new LynxFitaContext();
-  const authSvc = new AuthorityService(ctx);
-  const pki = authSvc.getPki();
-
-  const port = await authSvc.startServer(0);
-  assert.ok(port > 0);
-
-  const verification = authSvc.verifyClientCertificate(pki.topPatronCert.pem);
-  assert.equal(verification.valid, true);
-  assert.equal(verification.role, 'top-patron');
-  assert.equal(verification.revoked, false);
-
-  // Revoke client certificate on live CRL
-  authSvc.revokeCertificate(pki.topPatronCert.serialNumber);
-  const revokedVerification = authSvc.verifyClientCertificate(pki.topPatronCert.pem);
-  assert.equal(revokedVerification.valid, false);
-  assert.equal(revokedVerification.revoked, true);
-
-  authSvc.stopServer();
-});
-
-test('FederationService bundle reconciliation and rollback on CRL revocation', async () => {
+test('FederationService bundle reconciliation with valid Ed25519 signature', async () => {
   const ctx = new LynxFitaContext();
   const compiler = new CompilerService(ctx);
-  const authSvc = new AuthorityService(ctx);
   const fedSvc = new FederationService(ctx);
-  const pki = authSvc.getPki();
 
   assert.equal(fedSvc.getActiveVersion(), '1.0.0-embedded');
 
-  // Reconcile top patron client cert -> resolves to 2.2.0-canary-patron
-  const result1 = await fedSvc.reconcile(pki.topPatronCert.pem);
-  assert.equal(result1.activeVersion, '2.2.0-canary-patron');
-  assert.equal(result1.source, 'remote-federated');
-  assert.equal(fedSvc.getActiveVersion(), '2.2.0-canary-patron');
+  const keyPair = generateReleaseKeyPair();
+  const remoteBundle: FederatedBundle = {
+    version: '2.1.0-stable',
+    name: 'weather-showcase-stable',
+    sourceCode: 'export const version = "2.1.0-stable"; export default { city: "Sao Paulo", temp: 24.5 };',
+    sha256: computeSha256('export const version = "2.1.0-stable"; export default { city: "Sao Paulo", temp: 24.5 };'),
+  };
 
-  // Revoke top patron client cert on live CRL -> triggers automatic rollback to baseline
-  authSvc.revokeCertificate(pki.topPatronCert.serialNumber);
-  // Wait a microtask for event loop dispatch
-  await new Promise(r => setTimeout(r, 10));
+  const sig = signPayload(remoteBundle.sourceCode, keyPair.privateKeyPem);
+  const result = await fedSvc.reconcile(remoteBundle, sig, keyPair.publicKeyPem);
+
+  assert.equal(result.activeVersion, '2.1.0-stable');
+  assert.equal(result.bundleName, 'weather-showcase-stable');
+  assert.equal(result.source, 'remote-federated');
+  assert.equal(result.isFallback, false);
+  assert.equal(result.signatureValid, true);
+  assert.equal(fedSvc.getActiveVersion(), '2.1.0-stable');
+});
+
+test('FederationService deterministic rollback on tampered payload or signature failure', async () => {
+  const ctx = new LynxFitaContext();
+  const compiler = new CompilerService(ctx);
+  const fedSvc = new FederationService(ctx);
+
+  const keyPair = generateReleaseKeyPair();
+  const remoteBundle: FederatedBundle = {
+    version: '2.2.0-canary',
+    name: 'weather-showcase-canary',
+    sourceCode: 'export const version = "2.2.0-canary";',
+  };
+
+  // Provide an invalid signature
+  const fakeSig = 'aa'.repeat(64);
+  const result = await fedSvc.reconcile(remoteBundle, fakeSig, keyPair.publicKeyPem);
+
+  // Must fall back to embedded baseline
+  assert.equal(result.activeVersion, '1.0.0-embedded');
+  assert.equal(result.source, 'embedded-baseline');
+  assert.equal(result.isFallback, true);
+  assert.equal(result.signatureValid, false);
   assert.equal(fedSvc.getActiveVersion(), '1.0.0-embedded');
+
+  // Explicit rollback
+  await fedSvc.rollbackToEmbeddedBaseline('User requested baseline');
+  assert.equal(fedSvc.getActiveVersion(), '1.0.0-embedded');
+});
+
+test('GitHubReleasesUpdater OTA bundle synthesis and application', async () => {
+  const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.1');
+  const updateCheck = updater.checkForUpdates();
+  assert.equal(typeof updateCheck.hasUpdate, 'boolean');
+
+  const keyPair = generateReleaseKeyPair();
+  const ota = await updater.fetchOtaBundleFromGitHubPackages('weather-showcase', '2.1.0', {
+    signingPrivateKey: keyPair.privateKeyPem,
+    trustedPublicKey: keyPair.publicKeyPem,
+  });
+
+  assert.equal(ota.verified, true);
+  assert.equal(ota.version, '2.1.0');
+  assert.ok(ota.bytecode.length > 0);
+  assert.equal(ota.sha256.length, 64);
+
+  let hotReloadedName = '';
+  const applied = await updater.applyOtaBundle(ota, {
+    hotReloadBundle: (name: string) => {
+      hotReloadedName = name;
+      return true;
+    },
+  });
+
+  assert.equal(applied, true);
+  assert.equal(hotReloadedName, '@aleffita/weather-showcase');
 });

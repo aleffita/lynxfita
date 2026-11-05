@@ -100,7 +100,7 @@ export function startExplorerServer(port = 4173): Promise<{ close: () => Promise
             }
 
             if (url.pathname === '/api/settings/federation-sync') {
-              explorer.historyManager.log('cordis', 'Reconciled X.509 mTLS federation bundle manifest');
+              explorer.historyManager.log('cordis', 'Reconciled Ed25519 OTA federation bundle manifest');
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ ok: true }));
               return;

@@ -27,8 +27,8 @@ Interactive viewer: [`docs/architecture/cordis-spine.html`](architecture/cordis-
 
 Every capability in LynxFita follows a three-part seam contract:
 
-1. **Service Key & Contract**: Declares the typed property on `Context` (for example `ctx.dma`, `ctx.compiler`, `ctx.ffi`, `ctx.wasi`, `ctx.authority`, `ctx.federation`).
-2. **Service Provider (`Service` subclass)**: Owns the lifecycle of the underlying resource (a 64-byte-aligned Stationary DMA arena, a `node:tls` X.509 mTLS listener, or a `LoadLibraryExW` / `dlopen` native handle) and registers teardown hooks via `this.ctx.effect()`.
+1. **Service Key & Contract**: Declares the typed property on `Context` (for example `ctx.dma`, `ctx.compiler`, `ctx.ffi`, `ctx.wasi`, `ctx.updater`, `ctx.federation`).
+2. **Service Provider (`Service` subclass)**: Owns the lifecycle of the underlying resource (a 64-byte-aligned Stationary DMA arena, an Ed25519 digital signature verifier, or a `LoadLibraryExW` / `dlopen` native handle) and registers teardown hooks via `this.ctx.effect()`.
 3. **Consumer Plugin**: Declares required upstream services via `static inject = ['dma', 'compiler']` and runs only after all injected dependencies are active in the current `Fiber`.
 
 ```ts
@@ -54,27 +54,23 @@ export class WeatherSimdConsumer extends Service {
 | Service Key | TypeScript Provider (`packages/`) | C++20 Provider (`src/native/`) | Responsibility |
 | :--- | :--- | :--- | :--- |
 | `ctx.dma` | `DmaService` (`@lynxfita/core`) | `NativeDmaService` (`stationary_dma.cc`) | 64-byte-aligned Stationary DMA arena (`0x0000` telemetry, `0x1000` Protobuf wire, `0x2000` weather & shader uniforms), PPE/SPE ring lanes, SIMD reductions. |
-| `ctx.protobuf` | `ProtobufService` (`@lynxfita/core`) | `NativeProtobufService` (`protobuf_frame.cc`) | Zero-JSON binary wire framing (`tag << 3 | wire_type`) over `ctx.dma`. |
+| `ctx.protobuf` | `ProtobufService` (`@lynxfita/core`) | `NativeProtobufService` (`protobuf_frame.cc`) | Zero-JSON binary wire framing (`tag << 3 \| wire_type`) over `ctx.dma`. |
 | `ctx.compiler` | `CompilerService` (`@lynxfita/core`) | `NativeCompilerService` (`hermes_compiler.cc`) | Static Hermes ahead-of-time (`.hbc`) and runtime JIT/AOT compilation + register/stack VM execution. |
 | `ctx.ffi` | `FfiService` (`@lynxfita/codegen`) | `NativeFfiLoader` (`native_ffi_loader.cc`) | Cross-platform shared library loader (`LoadLibraryExW` on Windows, `dlopen` on Linux/macOS) with automatic `FreeLibrary`/`dlclose` on Fiber unload. |
 | `ctx.wasi` | `WasiService` (`@lynxfita/wasi-runtime`) | `WasiHostModule` (`wasi_host_module.cc`) | WIT (WebAssembly Interface Types) universal module IR and LEB128 Wasm binary interpreter over `ctx.dma`. |
 | `ctx.gpu` | `WebGpuService` (`@lynxfita/core`) | — | W3C WebGPU two-buffer staging, WGSL compute shaders, and `huggingface/kernels` catalog dispatch. |
-| `ctx.authority` | `MtlsAuthorityServer` (`@lynxfita/updater`) | — | Real `node:tls` X.509 mTLS server (`requestCert: true`), role extraction (`viewer`, `top-patron`, `canary`), and live Certificate Revocation List (CRL). |
-| `ctx.federation` | `FederationService` (`@lynxfita/updater`) | — | Reconciles embedded installation bundles vs. remote federated bundles and triggers `Fiber._unload()` rollback on CRL revocation. |
-| `ctx.router` | `ExplorerRouterService` (`examples/explorer`) | — | WeChat-style Super-App scheme router (`lynxfita://miniapp/<id>`) launching isolated Mini-App Fibers. |
+| `ctx.federation` | `FederationService` (`@lynxfita/updater`) | — | Reconciles embedded installation bundles vs. remote federated bundles using Ed25519 signatures and SHA-256 payload integrity verification, with deterministic rollback on mismatch. |
+| `ctx.router` | `ExplorerRouterService` (`examples/explorer`) | — | Application scheme router (`lynxfita://miniapp/<id>`) launching isolated Fibers. |
 
 ---
 
-## 3. Revertible Effects & Deterministic CRL Rollback
+## 3. Revertible Effects & Deterministic Baseline Rollback
 
-All resource registrations inside a Mini-App container execute inside an isolated Cordis `Fiber` (`ctx.isolate()`). When a Mini-App unloads—or when `ctx.authority` pushes a Certificate Revocation List (CRL) update revoking the active X.509 client certificate serial—`ctx.federation` invokes `remoteFiber._unload()`:
-
-![X.509 mTLS Module Federation & CRL Rollback Sequence](assets/mtls-federation-dark.png)
-
-Interactive viewer: [`docs/architecture/mtls-federation.html`](architecture/mtls-federation.html)
+All resource registrations inside an application container execute inside an isolated Cordis `Fiber` (`ctx.isolate()`). When an application unloads—or when `ctx.federation` encounters an invalid/tampered Ed25519 digital signature or SHA-256 mismatch—`ctx.federation` invokes `remoteFiber._unload()`:
 
 1. `ctx.gpu` releases WebGPU staging buffers.
 2. `ctx.wasi` unmaps linear memory views bound to `ctx.dma`.
 3. `ctx.ffi` calls `FreeLibrary` (Windows) or `dlclose` (POSIX) on native `.dll`/`.so`/`.dylib` handles.
 4. `ctx.dma` zeroes and returns Stationary DMA slots (`0x2000`) to the arena allocator.
-5. `ctx.federation` mounts the verified embedded installation bundle without dropping the Explorer host process.
+5. `ctx.federation` mounts the verified embedded installation baseline bundle without dropping the Explorer host process.
+

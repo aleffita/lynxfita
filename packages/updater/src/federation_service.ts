@@ -1,18 +1,18 @@
 /**
  * Module Federation Reconciler & Cordis Service
- * Reconciles embedded installation baseline (1.0.0-embedded) vs. remote federated bundles
- * (2.1.0-stable for viewer, 2.2.0-canary-patron for top-patron).
- * Automatically unloads child Fiber and rolls back to embedded bundle on CRL certificate revocation.
+ * Reconciles embedded installation baseline (1.0.0-embedded) vs. remote federated bundles.
+ * Uses Ed25519 cryptographic signatures and SHA-256 payload integrity verification.
+ * Automatically unloads child Fiber and deterministically rolls back to embedded baseline on integrity failure.
  */
 
 import { Service, type LynxFitaContext, type Fiber, type CompilerService } from '@lynxfita/core';
-import type { AuthorityService } from './authority_service.js';
+import { verifyPayload, computeSha256 } from './signature.js';
 
 export interface FederatedBundle {
   version: string;
   name: string;
   sourceCode: string;
-  minRole: 'viewer' | 'top-patron' | 'canary';
+  sha256?: string;
   isEmbeddedBaseline?: boolean;
 }
 
@@ -20,57 +20,27 @@ export interface ReconcileResult {
   activeVersion: string;
   bundleName: string;
   source: 'remote-federated' | 'embedded-baseline';
-  clientRole: string;
-  serialNumber: string;
   isFallback: boolean;
+  sha256: string;
+  signatureValid: boolean;
 }
 
 export class FederationService extends Service {
   public static provide = 'federation';
-  public static inject = ['authority', 'compiler'];
+  public static inject = ['compiler'];
 
   private embeddedBaseline: FederatedBundle = {
     version: '1.0.0-embedded',
     name: 'weather-showcase-baseline',
     sourceCode: 'export const version = "1.0.0-embedded"; export default { city: "Default Offline", temp: 20.0 };',
-    minRole: 'viewer',
     isEmbeddedBaseline: true,
   };
 
-  private remoteBundles: Map<string, FederatedBundle> = new Map([
-    [
-      'viewer',
-      {
-        version: '2.1.0-stable',
-        name: 'weather-showcase-stable',
-        sourceCode: 'export const version = "2.1.0-stable"; export default { city: "Sao Paulo", temp: 24.5 };',
-        minRole: 'viewer',
-      },
-    ],
-    [
-      'top-patron',
-      {
-        version: '2.2.0-canary-patron',
-        name: 'weather-showcase-patron',
-        sourceCode: 'export const version = "2.2.0-canary-patron"; export default { city: "Tokyo", temp: 18.2, patronFeatures: true };',
-        minRole: 'top-patron',
-      },
-    ],
-  ]);
-
   private activeBundleFiber: Fiber | undefined;
   private currentActiveVersion = '1.0.0-embedded';
-  private currentActiveClientSerial: string | undefined;
 
   constructor(ctx: LynxFitaContext) {
     super(ctx, 'federation');
-
-    // Listen to live CRL revocation events from AuthorityService
-    this.ctx.on('authority:revoked', async ({ serialNumber }: { serialNumber: string }) => {
-      if (this.currentActiveClientSerial === serialNumber) {
-        await this.rollbackToEmbeddedBaseline(`Certificate ${serialNumber} revoked on CRL`);
-      }
-    });
   }
 
   public getActiveVersion(): string {
@@ -82,63 +52,72 @@ export class FederationService extends Service {
   }
 
   /**
-   * Reconcile client certificate against module federation bundle targets
+   * Reconcile remote bundle against embedded baseline using Ed25519 signature & SHA-256 integrity verification.
    */
-  public async reconcile(clientCertPem: string): Promise<ReconcileResult> {
-    const authority = this.ctx.getService<AuthorityService>('authority');
+  public async reconcile(
+    bundle: FederatedBundle,
+    signatureHex: string,
+    trustedPublicKeyPem: string
+  ): Promise<ReconcileResult> {
     const compiler = this.ctx.getService<CompilerService>('compiler');
-
-    if (!authority || !compiler) {
-      throw new Error('Authority and Compiler services required for federation reconcile');
+    if (!compiler) {
+      throw new Error('CompilerService required for federation reconcile');
     }
 
-    const authResult = authority.verifyClientCertificate(clientCertPem);
-    this.currentActiveClientSerial = authResult.serialNumber;
+    const calculatedSha256 = computeSha256(bundle.sourceCode);
+    const expectedSha256 = bundle.sha256 || calculatedSha256;
+    const shaMatches = calculatedSha256 === expectedSha256;
 
-    if (!authResult.valid || authResult.revoked) {
-      await this.rollbackToEmbeddedBaseline('Client certificate untrusted or revoked');
+    // Verify Ed25519 signature over bundle source code
+    const sigValid = shaMatches && verifyPayload(bundle.sourceCode, signatureHex, trustedPublicKeyPem);
+
+    if (!sigValid) {
+      await this.rollbackToEmbeddedBaseline('Ed25519 signature verification or SHA-256 integrity check failed');
+      await this.ctx.emit('federation:rejected', {
+        version: bundle.version,
+        name: bundle.name,
+        reason: 'Signature or checksum mismatch',
+      });
       return {
         activeVersion: this.embeddedBaseline.version,
         bundleName: this.embeddedBaseline.name,
         source: 'embedded-baseline',
-        clientRole: authResult.role,
-        serialNumber: authResult.serialNumber,
         isFallback: true,
+        sha256: calculatedSha256,
+        signatureValid: false,
       };
     }
 
-    // Determine target bundle for role
-    const targetBundle = this.remoteBundles.get(authResult.role) || this.remoteBundles.get('viewer')!;
-
-    // Compile and activate in isolated child fiber
+    // Unload previous child fiber if any
     if (this.activeBundleFiber) {
       await this.activeBundleFiber._unload();
     }
 
-    const childCtx = this.ctx.isolate(`federation-${targetBundle.version}`);
+    const childCtx = this.ctx.isolate(`federation-${bundle.version}`);
     this.activeBundleFiber = childCtx.fiber;
 
     // Compile via Runtime AOT
-    compiler.compile(targetBundle.sourceCode, `bundle://${targetBundle.name}`);
+    compiler.compile(bundle.sourceCode, `bundle://${bundle.name}`);
 
-    // Register active bundle effects
+    // Register active bundle effect disposer
     childCtx.fiber.registerDisposer(() => {
       this.currentActiveVersion = this.embeddedBaseline.version;
     });
 
-    this.currentActiveVersion = targetBundle.version;
+    this.currentActiveVersion = bundle.version;
     await this.ctx.emit('federation:activated', {
-      version: targetBundle.version,
-      role: authResult.role,
+      version: bundle.version,
+      name: bundle.name,
+      sha256: calculatedSha256,
     });
 
     return {
-      activeVersion: targetBundle.version,
-      bundleName: targetBundle.name,
+      activeVersion: bundle.version,
+      bundleName: bundle.name,
       source: 'remote-federated',
-      clientRole: authResult.role,
-      serialNumber: authResult.serialNumber,
       isFallback: false,
+      sha256: calculatedSha256,
+      signatureValid: true,
     };
   }
 

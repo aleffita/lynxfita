@@ -1,6 +1,6 @@
 /**
  * LynxFita Native & Cordis Subsystem Integration Tests
- * Verifies end-to-end interoperability across Cordis, DMA, Protobuf, WIT codegen, WASI, and mTLS.
+ * Verifies end-to-end interoperability across Cordis, DMA, Protobuf, WIT codegen, WASI, and Ed25519 Federation.
  */
 
 import test from 'node:test';
@@ -15,9 +15,9 @@ import {
 } from '@lynxfita/core';
 import { parseWitSpec, JsiCodeGenerator } from '@lynxfita/codegen';
 import { WasiComponentService } from '@lynxfita/wasi-runtime';
-import { AuthorityService, FederationService } from '@lynxfita/updater';
+import { FederationService, generateReleaseKeyPair, signPayload } from '@lynxfita/updater';
 
-test('End-to-End Cordis Spine: Codegen -> DMA -> Protobuf -> WASI -> mTLS', async () => {
+test('End-to-End Cordis Spine: Codegen -> DMA -> Protobuf -> WASI -> Federation', async () => {
   // 1. Initialize root LynxFitaContext
   const ctx = new LynxFitaContext();
   const dma = new DmaService(ctx);
@@ -26,13 +26,11 @@ test('End-to-End Cordis Spine: Codegen -> DMA -> Protobuf -> WASI -> mTLS', asyn
   const ffi = new FfiService(ctx);
   const gpu = new GpuService(ctx);
   const wasi = new WasiComponentService(ctx);
-  const auth = new AuthorityService(ctx);
   const fed = new FederationService(ctx);
 
   assert.ok(ctx.hasService('dma'));
   assert.ok(ctx.hasService('protobuf'));
   assert.ok(ctx.hasService('wasi'));
-  assert.ok(ctx.hasService('authority'));
   assert.ok(ctx.hasService('federation'));
 
   // 2. Parse WIT Specification and verify DMA layout
@@ -66,14 +64,22 @@ interface weather-telemetry {
   const windChill = wasi.execute('computeWindChill', temp, wind);
   assert.ok(windChill > 0);
 
-  // 5. mTLS Authority and Module Federation
-  const pki = auth.getPki();
-  const reconcileRes = await fed.reconcile(pki.viewerCert.pem);
+  // 5. Ed25519 & SHA-256 Module Federation
+  const keyPair = generateReleaseKeyPair();
+  const remoteBundle = {
+    version: '2.1.0-stable',
+    name: 'weather-showcase-stable',
+    sourceCode: 'export const version = "2.1.0-stable"; export default { city: "Sao Paulo", temp: 24.5 };',
+  };
+  const validSig = signPayload(remoteBundle.sourceCode, keyPair.privateKeyPem);
+  const reconcileRes = await fed.reconcile(remoteBundle, validSig, keyPair.publicKeyPem);
   assert.equal(reconcileRes.activeVersion, '2.1.0-stable');
   assert.equal(reconcileRes.source, 'remote-federated');
 
-  // Verify CRL invalidation rollback
-  auth.revokeCertificate(pki.viewerCert.serialNumber);
-  await new Promise(r => setTimeout(r, 10));
+  // Verify signature mismatch deterministic rollback
+  const invalidSig = 'deadbeef'.repeat(16);
+  const fallbackRes = await fed.reconcile(remoteBundle, invalidSig, keyPair.publicKeyPem);
+  assert.equal(fallbackRes.activeVersion, '1.0.0-embedded');
+  assert.equal(fallbackRes.isFallback, true);
   assert.equal(fed.getActiveVersion(), '1.0.0-embedded');
 });

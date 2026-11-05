@@ -19,8 +19,8 @@ setupWorkspaceProxies();
 const WAVES: readonly (readonly string[])[] = [
   // Wave 1: Independent foundation packages
   ['packages/core', 'packages/codegen'],
-  // Wave 2: Downstream runtime and showcase packages
-  ['packages/wasi-runtime', 'packages/builder', 'packages/updater', 'examples/weather-showcase'],
+  // Wave 2: Downstream runtime, plugins, and showcase packages
+  ['packages/wasi-runtime', 'packages/builder', 'packages/updater', 'examples/weather-showcase', 'examples/plugins/weather-simd'],
   // Wave 3: Top-level consumers and CLI
   ['packages/cli', 'examples/explorer'],
 ];

@@ -1,6 +1,10 @@
-import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
-import { MtlsRbacLedger } from './mtls_rbac_ledger.js';
+import {
+  generateReleaseKeyPair,
+  signPayload,
+  verifyPayload,
+  computeSha256
+} from './signature.js';
 
 export interface ReleaseAsset {
   name: string;
@@ -23,6 +27,7 @@ export interface OtaBundlePackage {
   bytecode: Uint8Array;
   sha256: string;
   signature: string;
+  publicKey?: string;
   verified: boolean;
 }
 
@@ -128,10 +133,12 @@ export class GitHubReleasesUpdater {
   public async fetchOtaBundleFromGitHubPackages(
     packageName: string,
     targetVersion = '2.0.0',
-    ledger?: MtlsRbacLedger
+    options?: {
+      signingPrivateKey?: string;
+      trustedPublicKey?: string;
+    }
   ): Promise<OtaBundlePackage> {
     const cleanPkg = packageName.startsWith('@') ? packageName : `@aleffita/${packageName}`;
-    const rbacLedger = ledger || new MtlsRbacLedger();
 
     let resolvedVersion = targetVersion;
     let fetchedBytecode: Uint8Array | null = null;
@@ -235,13 +242,15 @@ export class GitHubReleasesUpdater {
       bytecode.set(payloadBytes, 8);
     }
 
-    const sha256 = createHash('sha256').update(bytecode).digest('hex');
+    const sha256 = computeSha256(bytecode);
 
-    // Issue cryptographic certificate and sign bundle hash
-    const cert = rbacLedger.issueCertificate(`dev-${cleanPkg.replace(/[^a-zA-Z0-9]/g, '_')}`, 'hw_seed_fita', ['distributor', 'viewer']);
-    const signature = cert.chainSignature;
+    // Cryptographic Ed25519 signing
+    const keyPair = (options?.signingPrivateKey && options?.trustedPublicKey)
+      ? { privateKeyPem: options.signingPrivateKey, publicKeyPem: options.trustedPublicKey }
+      : generateReleaseKeyPair();
 
-    const isValidChain = rbacLedger.verifyLedgerChainIntegrity();
+    const signature = signPayload(bytecode, keyPair.privateKeyPem);
+    const isSigValid = verifyPayload(bytecode, signature, keyPair.publicKeyPem);
 
     return {
       packageName: cleanPkg,
@@ -249,7 +258,8 @@ export class GitHubReleasesUpdater {
       bytecode,
       sha256,
       signature,
-      verified: isValidChain && this.verifyDownloadedAsset(bytecode, sha256)
+      publicKey: keyPair.publicKeyPem,
+      verified: isSigValid && this.verifyDownloadedAsset(bytecode, sha256)
     };
   }
 
@@ -313,7 +323,7 @@ export class GitHubReleasesUpdater {
     if (!expectedSha256 || expectedSha256.length !== 64) {
       return false;
     }
-    const actual = createHash('sha256').update(assetData).digest('hex');
+    const actual = computeSha256(assetData);
     return actual.toLowerCase() === expectedSha256.toLowerCase();
   }
 
@@ -343,7 +353,7 @@ export class GitHubReleasesUpdater {
           sizeBytes: 14800000
         }
       ],
-      notes: `v${version}: Weather Showcase MVI, WebGPU/WGSL shaders, Stationary DMA, Standalone C++20 lynxfita_explorer, and Multi-Platform Distribution.`
+      notes: `v${version}: Self-contained desktop executable runtime, Hermes bytecode, and multi-platform distribution.`
     };
   }
 }

@@ -16,7 +16,7 @@ author: aleffita
 
 # LynxFita Master Agentry Protocol
 
-LynxFita is an all-plugin, Cordis-powered ([`vendor/cordis`](file:///j:/limiar/packages/lynxfita/vendor/cordis), [arXiv:2608.25512](https://arxiv.org/abs/2608.25512)) native desktop and embedded runtime for LynxJS built on Static Hermes (`static_h`), C++20 JSI, WIT/WASI components, Stationary DMA, and X.509 mTLS Module Federation.
+LynxFita is an all-plugin, Cordis-powered ([`vendor/cordis`](file:///j:/limiar/packages/lynxfita/vendor/cordis), [arXiv:2608.25512](https://arxiv.org/abs/2608.25512)) self-contained native desktop runtime for LynxJS built on Static Hermes (`static_h`), C++20 JSI, WIT/WASI components, Stationary DMA, and Ed25519-signed OTA Module Federation.
 
 ---
 
@@ -28,7 +28,7 @@ Governance is modularized by subtree. Consult the owning `AGENTS.md` before modi
 [Repository Root] AGENTS.md (Standing Orders & Capability Seam Contract)
        │
        ├── docs/AGENTS.md (Tier Taxonomy, dsh-prose-standard, Archify Diagrams & OKF)
-       ├── packages/AGENTS.md (Cordis Capability Seams, WIT Codegen, Builder & mTLS Updater)
+       ├── packages/AGENTS.md (Cordis Capability Seams, WIT Codegen, Builder & Ed25519 Updater)
        ├── src/native/AGENTS.md (C++20 NativeContext, Dynamic .dll/.so/.dylib Loader & DMA Arena)
        ├── vendor/AGENTS.md (Zero-Fork Pinned Submodules & Atomic Patch Manager)
        ├── benchmarks/AGENTS.md (Kalibera & Jones Statistical Benchmarking Methodology)
@@ -58,14 +58,13 @@ Governance is modularized by subtree. Consult the owning `AGENTS.md` before modi
   - `ctx.ffi`: Cross-platform dynamic native library loader (`.dll` via `LoadLibraryExW`, `.so`/`.dylib` via `dlopen`) with automatic `FreeLibrary`/`dlclose` on Fiber `_unload()`.
   - `ctx.wasi`: WIT (WebAssembly Interface Types) universal module IR and sandboxed WASI host bound to `ctx.dma`.
   - `ctx.gpu`: W3C WebGPU two-buffer staging + WGSL compute shaders + `huggingface/kernels`.
-  - `ctx.authority`: Real `node:tls` X.509 mTLS Authority Server (`requestCert: true`), role-bearing client certificates (`viewer`, `top-patron`, `canary`), and live Certificate Revocation List (CRL).
-  - `ctx.federation`: Bundler Module Federation & OTA reconciler (embedded installation bundle vs. remote federated bundle) with live certificate revocation rollback (`Fiber._unload()`).
+  - `ctx.federation`: Module Federation & OTA reconciler (embedded installation bundle vs. remote federated bundle) with cryptographic Ed25519 signature & SHA-256 payload integrity verification and deterministic baseline rollback (`Fiber._unload()`).
 - **Registrations Are Revertible Effects**: Every resource registration goes through `ctx.effect()` or generator `yield` and returns a disposer so reload and teardown unwind in LIFO order.
 
 ### B. Zero Polling, Single Atomic Commands & Anti-Reward-Hacking
 - **Zero Polling**: Never poll background tasks or subagents; rely strictly on Reactive Wakeup.
 - **Single Atomic Commands**: Never chain shell commands with `;`, `&&`, or `||`.
-- **Zero Mocks / Zero Reward Hacking**: Never fake mTLS/RBAC with string tokens (`MTLS_AUTH_TOKEN_...`), never hardcode benchmark results, and never weaken test assertions.
+- **Zero Mocks / Zero Reward Hacking**: Never fake cryptographic signatures with mock strings, never hardcode benchmark results, and never weaken test assertions.
 
 ### C. DeepSeek-Harness Prose Standard (`dsh-prose-standard`) & Visual Evidence
 - Write direct, factual contracts using [`dsh-prose-standard`](file:///j:/limiar/packages/lynxfita/.agents/skills/dsh-prose-standard/SKILL.md). Never use AI-slop buzzwords (`"industrial port"`, `"v2.0 Architecture"`, `"advance the frontier"`, `"state-of-the-art"`).

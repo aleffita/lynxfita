@@ -1,6 +1,6 @@
 {
   "name": "@lynxfita/wasi-runtime",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "LynxFita WASI Runtime: WASI/WASIX sandboxed native module host integration for Static Hermes and Lynx",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

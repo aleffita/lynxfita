@@ -302,27 +302,24 @@ export function renderHtmlWeatherApp(state: WeatherState): string {
         </div>
       </div>
     `;
-  } else if (screen === 'shader-dma-inspector') {
+  } else if (screen === 'atmosphere-radar') {
     screenContent = `
-      <div class="screen-dma-inspector" style="padding: 20px;">
-        <h3 style="margin-top: 0; color: #f9d65d;">Stationary DMA (0x2000) & WebGPU Inspector</h3>
-        <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px; margin-bottom: 20px; font-family: monospace;">
-          <div style="color: #f9d65d; font-weight: bold; margin-bottom: 8px;">DMA TELEMETRY SLOTS [0x2000 - 0x2020]</div>
-          <div style="font-size: 13px; line-height: 1.6;">
-            0x2000 [Temp]:       ${state.current.temperature.toFixed(2)} °C<br/>
-            0x2004 [Humidity]:   ${state.current.humidity.toFixed(2)} %<br/>
-            0x2008 [Pressure]:   ${state.current.pressure.toFixed(2)} hPa<br/>
-            0x200C [WindSpeed]:  ${state.current.windSpeed.toFixed(2)} km/h<br/>
-            0x2010 [SolarFlux]:  450.00 W/m²<br/>
-            0x2014 [DewPoint]:   ${(state.current.temperature - ((100 - state.current.humidity) / 5)).toFixed(2)} °C<br/>
-            0x2018 [HeatIndex]:  ${(state.current.temperature + 1.2).toFixed(2)} °C<br/>
-            0x201C [WindChill]:  ${state.current.temperature.toFixed(2)} °C
+      <div class="screen-radar" style="padding: 20px;">
+        <h3 style="margin-top: 0; color: #f9d65d;">Condições Atmosféricas & Radar</h3>
+        <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+          <div style="color: #f9d65d; font-weight: bold; margin-bottom: 8px;">DADOS METEOROLÓGICOS DETALHADOS</div>
+          <div style="font-size: 13px; line-height: 1.8;">
+            Temperatura Atual: ${state.current.temperature.toFixed(1)} °C<br/>
+            Umidade Relativa: ${state.current.humidity.toFixed(0)} %<br/>
+            Pressão Atmosférica: ${state.current.pressure.toFixed(0)} hPa<br/>
+            Velocidade do Vento: ${state.current.windSpeed.toFixed(1)} km/h<br/>
+            Ponto de Orvalho: ${(state.current.temperature - ((100 - state.current.humidity) / 5)).toFixed(1)} °C<br/>
+            Sensação Térmica: ${(state.current.temperature + 1.2).toFixed(1)} °C
           </div>
         </div>
         <div style="background: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 16px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span style="font-weight: bold; color: #f9d65d;">WebGPU WGSL Wave Simulator</span>
-            <span style="font-size: 12px; color: ${textMuted};">weather_atmosphere.wgsl</span>
+            <span style="font-weight: bold; color: #f9d65d;">Simulação de Fluxo de Ar</span>
           </div>
           <canvas id="atmosphereCanvas" width="400" height="100" style="width: 100%; height: 100px; background: #0e0e16; border-radius: 6px; display: block;"></canvas>
         </div>
@@ -398,10 +395,6 @@ export function renderHtmlWeatherApp(state: WeatherState): string {
                 style="flex: 1; padding: 12px 6px; font-size: 12px; font-weight: ${screen === 'city-search' ? 'bold' : 'normal'}; background: none; border: none; border-bottom: 2px solid ${screen === 'city-search' ? '#f9d65d' : 'transparent'}; color: inherit; cursor: pointer;">
           Cidades
         </button>
-        <button onclick="dispatchWeatherIntent({ type: 'SWITCH_SCREEN', payload: { screen: 'shader-dma-inspector' } })"
-                style="flex: 1; padding: 12px 6px; font-size: 12px; font-weight: ${screen === 'shader-dma-inspector' ? 'bold' : 'normal'}; background: none; border: none; border-bottom: 2px solid ${screen === 'shader-dma-inspector' ? '#f9d65d' : 'transparent'}; color: inherit; cursor: pointer;">
-          DMA / GPU
-        </button>
         <button onclick="dispatchWeatherIntent({ type: 'SWITCH_SCREEN', payload: { screen: 'location-error-boundary' } })"
                 style="flex: 1; padding: 12px 6px; font-size: 12px; font-weight: ${screen === 'location-error-boundary' ? 'bold' : 'normal'}; background: none; border: none; border-bottom: 2px solid ${screen === 'location-error-boundary' ? '#f9d65d' : 'transparent'}; color: inherit; cursor: pointer;">
           Erro
@@ -446,8 +439,7 @@ export function renderAnsiWeatherView(state: WeatherState): string {
 | Umidade:      ${state.current.humidity.toFixed(1)}% | Pressão: ${state.current.pressure.toFixed(1)} hPa
 | Vento:        ${state.current.windSpeed.toFixed(1)} km/h
 +-------------------------------------------------------------+
-| Telemetria DMA [0x2000]: [${state.current.temperature}, ${state.current.humidity}, ${state.current.pressure}, ${state.current.windSpeed}]
-| Modo: ${state.isOfflineFallback ? 'Deterministic WASI/DMA Fallback' : 'Live OpenWeatherMap API'}
+| Status: Sincronizado | Modo: ${state.isOfflineFallback ? 'Offline (Previsão Local)' : 'Live OpenWeatherMap API'}
 +-------------------------------------------------------------+
 | Previsão Horária (Hourly Forecast):                         |
 |   +3h:  ${formatTimeAMPM(state.hourly['3h'].dt)} -> ${state.hourly['3h'].temp.toFixed(0)}°C ${resolveWeatherIcon(state.hourly['3h'].icon).unicodeGlyph} (${state.hourly['3h'].condition})
