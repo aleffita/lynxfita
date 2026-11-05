@@ -22,6 +22,9 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 
@@ -323,7 +326,7 @@ int RunIntegratedShowcaseDemo() {
   std::cout << "\n[6/8] Initializing Hermes Runtime AOT Compiler & Bytecode VM..." << std::endl;
   HermesRuntimeCompiler compiler;
   auto compileResult = compiler.CompileSource(
-    "const computeAdvection = (temp, wind) => temp * 0.05 + wind * 0.2;",
+    "const computeAdvection = (temp, wind) => temp * 0.05 + wind * 0.2; computeAdvection(24.5, 12.0);",
     "lynxfita://weather/advection.js"
   );
   bool bcValid = compileResult.success && HermesRuntimeCompiler::ValidateBytecode(compileResult.bytecode.data(), compileResult.bytecode.size());
