@@ -1,3 +1,10 @@
+/**
+ * WASI Runtime & Cordis Component Service
+ * Zero-copy execution bound to Stationary DMA with capability-scoped security sandboxes.
+ */
+
+import { Service, type LynxFitaContext, type DmaService } from '@lynxfita/core';
+
 export interface WasiHostConfig {
   maxMemoryBytes: number;
   environment: Record<string, string>;
@@ -7,15 +14,21 @@ export interface WasiHostConfig {
 export class WasiHostContext {
   private config: WasiHostConfig;
   private memory: Uint8Array;
+  private dmaBound = false;
 
   constructor(config: Partial<WasiHostConfig> = {}) {
     this.config = {
       maxMemoryBytes: 64 * 1024 * 1024,
       environment: {},
       preopenedPaths: [],
-      ...config
+      ...config,
     };
     this.memory = new Uint8Array(64 * 1024); // 64KB initial 1 WASM page
+  }
+
+  public bindDmaMemory(dmaBuffer: Uint8Array): void {
+    this.memory = dmaBuffer;
+    this.dmaBound = true;
   }
 
   public writeBytes(offset: number, bytes: Uint8Array): number {
@@ -23,6 +36,9 @@ export class WasiHostContext {
       throw new Error(`WASI memory out-of-bounds: invalid negative offset ${offset}`);
     }
     if (offset + bytes.length > this.memory.length) {
+      if (this.dmaBound) {
+        throw new Error(`WASI DMA bounds fault: write at ${offset} exceeds DMA capacity`);
+      }
       this.growMemory(offset + bytes.length);
     }
     this.memory.set(bytes, offset);
@@ -52,6 +68,9 @@ export class WasiHostContext {
   }
 
   public growMemory(targetSize: number): void {
+    if (this.dmaBound) {
+      throw new Error('Cannot grow statically bounded DMA memory');
+    }
     if (targetSize > this.config.maxMemoryBytes) {
       throw new Error(`WASI memory allocation trap: requested ${targetSize} exceeds limit ${this.config.maxMemoryBytes}`);
     }
@@ -63,5 +82,39 @@ export class WasiHostContext {
 
   public getMemorySize(): number {
     return this.memory.length;
+  }
+}
+
+export class WasiComponentService extends Service {
+  public static provide = 'wasi';
+  public static inject = ['dma'];
+
+  private hostContext: WasiHostContext;
+  private exports = new Map<string, (...args: any[]) => any>();
+
+  constructor(ctx: LynxFitaContext, config: Partial<WasiHostConfig> = {}) {
+    super(ctx, 'wasi');
+    this.hostContext = new WasiHostContext(config);
+
+    const dma = ctx.getService<DmaService>('dma');
+    if (dma) {
+      this.hostContext.bindDmaMemory(dma.getRawBuffer());
+    }
+  }
+
+  public getHostContext(): WasiHostContext {
+    return this.hostContext;
+  }
+
+  public registerExport(name: string, fn: (...args: any[]) => any): void {
+    this.exports.set(name, fn);
+  }
+
+  public execute(name: string, ...args: any[]): any {
+    const fn = this.exports.get(name);
+    if (!fn) {
+      throw new Error(`WASI entrypoint '${name}' not found`);
+    }
+    return fn(...args);
   }
 }

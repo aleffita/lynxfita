@@ -16,6 +16,20 @@ enum class HermesCompilerMode : uint8_t {
   StaticJitHybrid = 0x04
 };
 
+enum class HbcOpcode : uint8_t {
+  OP_CONST_F64 = 0x01,
+  OP_CONST_STR = 0x02,
+  OP_LOAD_ARG  = 0x03,
+  OP_ADD       = 0x04,
+  OP_SUB       = 0x05,
+  OP_MUL       = 0x06,
+  OP_DIV       = 0x07,
+  OP_CALL_HOST = 0x08,
+  OP_DMA_LOAD_F32  = 0x09,
+  OP_DMA_STORE_F32 = 0x0A,
+  OP_RET       = 0x0B
+};
+
 struct CompilationOptions {
   bool optimize_aot{true};
   bool static_h_mode{true};

@@ -1,6 +1,8 @@
 /**
- * Lightweight Header-Only Protocol Buffer Wire Protocol Encoder & Decoder
+ * Lightweight Header-Only Protocol Buffer Wire Protocol Encoder & Decoder & Cordis Service
  */
+
+import { Service, type LynxFitaContext } from './cordis.js';
 
 export enum WireType {
   Varint = 0,
@@ -101,5 +103,30 @@ export class ProtobufWire {
     }
 
     return { moduleName, methodName, payload };
+  }
+}
+
+export class ProtobufService extends Service {
+  public static provide = 'protobuf';
+  public static inject = [];
+
+  constructor(ctx: LynxFitaContext) {
+    super(ctx, 'protobuf');
+  }
+
+  public encodeVarint(val: number): Uint8Array {
+    return ProtobufWire.encodeVarint(val);
+  }
+
+  public decodeVarint(buffer: Uint8Array, offset = 0) {
+    return ProtobufWire.decodeVarint(buffer, offset);
+  }
+
+  public encodeMethodCall(mod: string, method: string, payload: string): Uint8Array {
+    return ProtobufWire.encodeMethodCall(mod, method, payload);
+  }
+
+  public decodeMethodCall(buffer: Uint8Array) {
+    return ProtobufWire.decodeMethodCall(buffer);
   }
 }

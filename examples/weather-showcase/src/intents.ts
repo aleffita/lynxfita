@@ -3,15 +3,27 @@
  * Unidirectional intent declarations for user interactions and telemetry updates.
  */
 
+import type { WeatherScreen } from './model.js';
+
 export type WeatherIntent =
   | { type: 'REFRESH_WEATHER'; payload?: { lat?: number; lon?: number } }
   | { type: 'TOGGLE_THEME' }
+  | { type: 'SWITCH_SCREEN'; payload: { screen: WeatherScreen } }
+  | { type: 'SELECT_CITY'; payload: { city: string; country: string; lat: number; lon: number } }
   | { type: 'UPDATE_COORDINATES'; payload: { lat: number; lon: number; city?: string; country?: string } }
   | { type: 'GRANT_LOCATION_PERMISSION' }
   | { type: 'TRIGGER_LOCATION_ERROR'; payload: { message: string } }
   | { type: 'SIMULATE_OFFLINE_FALLBACK' };
 
 export const Intents = {
+  switchScreen: (screen: WeatherScreen): WeatherIntent => ({
+    type: 'SWITCH_SCREEN',
+    payload: { screen }
+  }),
+  selectCity: (city: string, country: string, lat: number, lon: number): WeatherIntent => ({
+    type: 'SELECT_CITY',
+    payload: { city, country, lat, lon }
+  }),
   refreshWeather: (lat?: number, lon?: number): WeatherIntent => {
     if (lat !== undefined && lon !== undefined) {
       return {

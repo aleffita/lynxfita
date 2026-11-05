@@ -82,7 +82,7 @@ export class MtlsRbacLedger {
       roles,
       issuedAt: now,
       expiresAt: now + (365 * 24 * 60 * 60 * 1000),
-      chainSignature: `CERT_CHAIN_SIG_${signatureHex.substring(0, 32)}`
+      chainSignature: signatureHex
     };
 
     const block: LedgerBlock = {
@@ -158,7 +158,7 @@ export class MtlsRbacLedger {
     }
 
     return {
-      token: `MTLS_AUTH_TOKEN_${cert.publicKeyFingerprint}`,
+      token: `${cert.publicKeyFingerprint}_${cert.chainSignature.substring(0, 32)}`,
       deviceId,
       grantedRoles: cert.roles,
       validUntil: Date.now() + 3600000 // 1 hour token

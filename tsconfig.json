@@ -6,12 +6,14 @@
     "lib": ["ES2022", "DOM"],
     "baseUrl": ".",
     "paths": {
-      "@lynxfita/core": ["packages/core/dist/index.d.ts"],
-      "@lynxfita/wasi-runtime": ["packages/wasi-runtime/dist/index.d.ts"],
-      "@lynxfita/codegen": ["packages/codegen/dist/index.d.ts"],
-      "@lynxfita/builder": ["packages/builder/dist/index.d.ts"],
-      "@lynxfita/updater": ["packages/updater/dist/index.d.ts"],
-      "@lynxfita/example-weather-showcase": ["examples/weather-showcase/dist/index.d.ts"]
+      "@lynxfita/core": ["packages/core/src/index.ts"],
+      "@lynxfita/wasi-runtime": ["packages/wasi-runtime/src/index.ts"],
+      "@lynxfita/codegen": ["packages/codegen/src/index.ts"],
+      "@lynxfita/builder": ["packages/builder/src/index.ts"],
+      "@lynxfita/updater": ["packages/updater/src/index.ts"],
+      "@lynxfita/cli": ["packages/cli/src/index.ts"],
+      "@lynxfita/example-weather-showcase": ["examples/weather-showcase/src/index.ts"],
+      "@lynxfita/explorer": ["examples/explorer/src/index.ts"]
     },
     "declaration": true,
     "declarationMap": true,

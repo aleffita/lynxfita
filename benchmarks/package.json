@@ -1,0 +1,14 @@
+{
+  "name": "@lynxfita/benchmarks",
+  "version": "2.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Kalibera & Jones Statistical Performance Benchmarks for LynxFita",
+  "scripts": {
+    "bench": "node --experimental-strip-types run_benchmarks.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^5.8.2"
+  }
+}

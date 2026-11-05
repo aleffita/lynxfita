@@ -1,13 +1,13 @@
 {
   "name": "@lynxfita/codegen",
-  "version": "0.1.0",
+  "version": "2.1.0",
   "description": "LynxFita Codegen: Type-safe C++ JSI HostObject and TypeScript binding generator for native modules",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
     "lint": "echo codegen:lint-ok"
   },
   "devDependencies": {
