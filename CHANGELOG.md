@@ -21,8 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `"start": "node ./bin/lynxfita.js"` to `packages/cli/package.json`, ensuring `pnpm --filter "@lynxfita/cli" start doctor` functions as documented.
 - **OTA Updater Registry Metadata & Tarball Consumption (`DEF-04`)**:
   - Implemented HTTP response parsing for npm packages (`res.json()`, `dist-tags.latest`, `versions[...].dist.tarball`) in `packages/updater/src/github_releases_updater.ts`, downloading remote bytecode payloads and using deterministic offline synthesis as a resilient fallback.
-- **GitHub Releases SHA-256 Checksums Parsing (`DEF-05`)**:
+  - Added support for gzip-compressed npm tarball (`.tgz`) decompression and embedded Hermes bytecode (`0x1F 0x48 0x42 0x43`) extraction via `node:zlib`.
+  - Added robust recovery against malformed or corrupted network payloads, cleanly falling back to deterministic HBC synthesis.
+- **GitHub Releases SHA-256 Checksums Parsing & Empty Asset Resilience (`DEF-05`)**:
   - Integrated automated `checksums.sha256` retrieval and parsing in `fetchLatestReleaseFromGitHub`, matching individual assets against verified cryptographic hashes.
+  - Implemented graceful fallback to deterministic release assets when an upstream GitHub release has no published binary assets, eliminating `assert.ok(release.assets.length > 0)` assertion failures.
 - **Codegen Typed Parameter Forwarding (`DEF-06`)**:
   - Fixed C++ HostObject method dispatch in `@lynxfita/codegen` to pass `arg_${p.name}_typed` for typed number arguments.
 
