@@ -51,6 +51,14 @@ void PrintHelp() {
 }
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
+struct NativeDesktopHostState {
+  std::shared_ptr<HermesRuntimeAdapter> runtime;
+  std::shared_ptr<DmaEibEngine> dma;
+  std::string loadedBundlePath;
+};
+
+static NativeDesktopHostState g_hostState;
+
 static LRESULT CALLBACK ExplorerWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   switch (msg) {
     case WM_PAINT: {
@@ -59,40 +67,10 @@ static LRESULT CALLBACK ExplorerWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
       RECT rect;
       GetClientRect(hwnd, &rect);
 
-      // Dark theme background #1a1a24
-      HBRUSH bgBrush = CreateSolidBrush(RGB(0x1a, 0x1a, 0x24));
+      // Clean dark canvas background #121218 (Zero-GDI text simulation facade)
+      HBRUSH bgBrush = CreateSolidBrush(RGB(0x12, 0x12, 0x18));
       FillRect(hdc, &rect, bgBrush);
       DeleteObject(bgBrush);
-
-      // Super-App Gold branding #f9d65d
-      SetTextColor(hdc, RGB(0xf9, 0xd6, 0x5d));
-      SetBkMode(hdc, TRANSPARENT);
-      HFONT hFont = CreateFontW(22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-                               OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-                               DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-      HGDIOBJ oldFont = SelectObject(hdc, hFont);
-
-      RECT titleRect = {30, 30, rect.right - 30, 80};
-      DrawTextW(hdc, L"LynxFita Super-App Explorer", -1, &titleRect, DT_LEFT | DT_TOP);
-
-      SetTextColor(hdc, RGB(0xd0, 0xd0, 0xd8));
-      HFONT subFont = CreateFontW(15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-                                 OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-                                 DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-      SelectObject(hdc, subFont);
-
-      RECT statusRect = {30, 85, rect.right - 30, 250};
-      LPCWSTR statusText =
-          L"Status: Operational\n"
-          L"Runtime: Static Hermes C++20 Engine (Endogenous Cordis Spine)\n"
-          L"Active Showcase: Weather Super-App (MVI Reactive Architecture)\n"
-          L"Plugins Mounted: Weather Service, Atmospheric Radar, SIMD Forecast Engine\n"
-          L"Packaging: Hermetic Self-Contained Desktop Target";
-      DrawTextW(hdc, statusText, -1, &statusRect, DT_LEFT | DT_TOP);
-
-      SelectObject(hdc, oldFont);
-      DeleteObject(hFont);
-      DeleteObject(subFont);
 
       EndPaint(hwnd, &ps);
       return 0;
@@ -108,7 +86,88 @@ static LRESULT CALLBACK ExplorerWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
   }
 }
 
-int RunGuiMode(bool auto_close_timer = false) {
+int RunBytecodeBundle(const std::string& hbcPath) {
+  std::ifstream file(hbcPath, std::ios::binary | std::ios::ate);
+  if (!file.is_open()) {
+    std::cerr << "[ERROR] Could not open Hermes bytecode bundle: " << hbcPath << std::endl;
+    return 1;
+  }
+
+  std::streamsize size = file.tellg();
+  file.seekg(0, std::ios::beg);
+
+  std::vector<uint8_t> buffer(size);
+  if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+    std::cerr << "[ERROR] Failed reading Hermes bytecode bundle: " << hbcPath << std::endl;
+    return 1;
+  }
+
+  if (!HermesRuntimeCompiler::ValidateBytecode(buffer.data(), buffer.size())) {
+    std::cerr << "[ERROR] File is not a valid Hermes bytecode bundle (invalid magic or corrupted header): " << hbcPath << std::endl;
+    return 1;
+  }
+
+  std::cout << "[INFO] Loading authentic Hermes bytecode bundle: " << hbcPath << " (" << buffer.size() << " bytes)" << std::endl;
+  auto runtime = std::make_shared<HermesRuntimeAdapter>();
+  if (!runtime->Initialize(false)) {
+    std::cerr << "[ERROR] Failed to initialize Hermes runtime adapter." << std::endl;
+    return 1;
+  }
+
+  auto dma = std::make_shared<DmaEibEngine>(1024 * 1024);
+  runtime->AttachDmaEngine(dma);
+
+  auto res = runtime->EvaluateBytecode(buffer.data(), buffer.size(), hbcPath, {});
+  if (!res.IsSuccess()) {
+    std::cerr << "[ERROR] Bytecode evaluation failed: " << res.error_message << std::endl;
+    return 1;
+  }
+
+  std::cout << "[SUCCESS] Bytecode bundle executed successfully. Result: " << res.result_payload << std::endl;
+  return 0;
+}
+
+int RunGuiMode(bool auto_close_timer = false, const std::string& bundlePath = "") {
+  g_hostState.runtime = std::make_shared<HermesRuntimeAdapter>();
+  if (!g_hostState.runtime->Initialize(false)) {
+    std::cerr << "[ERROR] Failed initializing Hermes runtime for native desktop host." << std::endl;
+    return 1;
+  }
+  g_hostState.dma = std::make_shared<DmaEibEngine>(1024 * 1024);
+  g_hostState.runtime->AttachDmaEngine(g_hostState.dma);
+
+  std::string activeBundle = bundlePath;
+  if (activeBundle.empty()) {
+    std::vector<std::string> searchPaths = {
+      "bundles/explorer.hbc",
+      "bundles/app.hbc",
+      "dist/bundles/explorer.hbc"
+    };
+    for (const auto& p : searchPaths) {
+      if (std::ifstream(p).good()) {
+        activeBundle = p;
+        break;
+      }
+    }
+  }
+
+  if (!activeBundle.empty()) {
+    std::ifstream file(activeBundle, std::ios::binary | std::ios::ate);
+    if (file.is_open()) {
+      std::streamsize size = file.tellg();
+      file.seekg(0, std::ios::beg);
+      std::vector<uint8_t> buffer(size);
+      if (file.read(reinterpret_cast<char*>(buffer.data()), size) &&
+          HermesRuntimeCompiler::ValidateBytecode(buffer.data(), buffer.size())) {
+        auto res = g_hostState.runtime->EvaluateBytecode(buffer.data(), buffer.size(), activeBundle, {});
+        if (res.IsSuccess()) {
+          g_hostState.loadedBundlePath = activeBundle;
+          std::cout << "[INFO] Evaluated bundle in desktop host: " << activeBundle << " (" << res.result_payload << ")" << std::endl;
+        }
+      }
+    }
+  }
+
   HINSTANCE hInstance = GetModuleHandleW(nullptr);
   const wchar_t CLASS_NAME[] = L"LynxFitaExplorerNativeWindow";
 
@@ -140,7 +199,7 @@ int RunGuiMode(bool auto_close_timer = false) {
   UpdateWindow(hwnd);
 
   if (auto_close_timer) {
-    SetTimer(hwnd, 1, 1500, nullptr); // Close after 1.5s during automated test
+    SetTimer(hwnd, 1, 1500, nullptr); // Close after 1.5s during automated verification
   }
 
   MSG msg{};
@@ -152,8 +211,52 @@ int RunGuiMode(bool auto_close_timer = false) {
   return 0;
 }
 #else
-int RunGuiMode(bool /*auto_close_timer*/ = false) {
+int RunBytecodeBundle(const std::string& hbcPath) {
+  std::ifstream file(hbcPath, std::ios::binary | std::ios::ate);
+  if (!file.is_open()) {
+    std::cerr << "[ERROR] Could not open Hermes bytecode bundle: " << hbcPath << std::endl;
+    return 1;
+  }
+
+  std::streamsize size = file.tellg();
+  file.seekg(0, std::ios::beg);
+
+  std::vector<uint8_t> buffer(size);
+  if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+    std::cerr << "[ERROR] Failed reading Hermes bytecode bundle: " << hbcPath << std::endl;
+    return 1;
+  }
+
+  if (!HermesRuntimeCompiler::ValidateBytecode(buffer.data(), buffer.size())) {
+    std::cerr << "[ERROR] File is not a valid Hermes bytecode bundle: " << hbcPath << std::endl;
+    return 1;
+  }
+
+  std::cout << "[INFO] Loading authentic Hermes bytecode bundle: " << hbcPath << " (" << buffer.size() << " bytes)" << std::endl;
+  auto runtime = std::make_shared<HermesRuntimeAdapter>();
+  if (!runtime->Initialize(false)) {
+    std::cerr << "[ERROR] Failed to initialize Hermes runtime adapter." << std::endl;
+    return 1;
+  }
+
+  auto dma = std::make_shared<DmaEibEngine>(1024 * 1024);
+  runtime->AttachDmaEngine(dma);
+
+  auto res = runtime->EvaluateBytecode(buffer.data(), buffer.size(), hbcPath, {});
+  if (!res.IsSuccess()) {
+    std::cerr << "[ERROR] Bytecode evaluation failed: " << res.error_message << std::endl;
+    return 1;
+  }
+
+  std::cout << "[SUCCESS] Bytecode bundle executed successfully. Result: " << res.result_payload << std::endl;
+  return 0;
+}
+
+int RunGuiMode(bool /*auto_close_timer*/ = false, const std::string& bundlePath = "") {
   std::cout << "[INFO] GUI mode requested. Standalone multi-platform Explorer active." << std::endl;
+  if (!bundlePath.empty()) {
+    return RunBytecodeBundle(bundlePath);
+  }
   return 0;
 }
 #endif
@@ -381,10 +484,19 @@ int main(int argc, char* argv[]) {
       return VerifyNavigationLifecycle();
     }
     if (arg1 == "--gui") {
-      return RunGuiMode(false);
+      std::string bundle = (argc > 2) ? argv[2] : "";
+      return RunGuiMode(false, bundle);
     }
     if (arg1 == "--gui-test") {
-      return RunGuiMode(true);
+      return RunGuiMode(true, "");
+    }
+    if (arg1 == "--run") {
+      if (argc < 3) {
+        std::cerr << "[ERROR] Missing bytecode bundle file path for --run" << std::endl;
+        PrintHelp();
+        return 1;
+      }
+      return RunBytecodeBundle(argv[2]);
     }
     if (arg1 == "--demo") {
       return RunIntegratedShowcaseDemo();
