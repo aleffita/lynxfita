@@ -73,3 +73,16 @@ Governance is modularized by subtree. Consult the owning `AGENTS.md` before modi
 ### D. Coordinator Ultimate Liability & Strict Gitflow
 - The Principal Coordinator bears 100% liability for all subagent actions, diffs, and CI gates.
 - All changes flow through tracked GitHub Issues (`Closes #N`) on `feature/*` or `fix/*` branches into `develop` and `main`, with mandatory adversarial review (`CordisAdversarialAuditor`) and immediate dead-branch deletion (`delete_branch_on_merge = true`).
+
+### E. Authentic Runtime & Upstream Submodule Primacy
+1. **Upstream Submodules Are the Material Authority**:
+   - All runtime capabilities attributed to Hermes (`vendor/hermes`), Lynx (`vendor/lynx`), Lynxtron (`vendor/lynxtron`), and Cordis (`vendor/cordis`) must link directly against the pinned upstream submodules via atomic patches.
+   - Hand-rolled toy interpreters, regex compilers, and stub VMs in `src/native/` or `packages/core/` are strictly prohibited.
+2. **Native UI Surface Invariant**:
+   - The native desktop shell must instantiate an authentic `LynxView` or `LynxWindow` rendering surface.
+   - Drawing text with Win32 GDI `DrawTextW` or serving HTML to Google Chrome via Playwright cannot be documented or released as a native desktop application.
+3. **Truth in Documentation and Benchmarks**:
+   - `README.md` and `BENCHMARK.md` must describe only verified, material capabilities. Experimental or planned capabilities must be explicitly labeled as Roadmap items.
+   - Benchmarks must measure compiled native C++ code running against real workloads, not Node.js in-memory buffer operations.
+4. **Relocatable Self-Contained Binary Integrity**:
+   - Executable releases must contain the native host, compiled application bytecode, required dynamic libraries, and assets in a relocatable bundle verified by Ed25519 signatures.
