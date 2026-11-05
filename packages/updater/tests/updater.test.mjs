@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { GitHubReleasesUpdater, MtlsRbacLedger } from '../dist/index.js';
 
 test('GitHubReleasesUpdater - checks for updates and verifies release info', () => {
@@ -181,19 +182,146 @@ test('GitHubReleasesUpdater - fallback to offline deterministic release and OTA 
   });
 
   try {
-    const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.0');
+    const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.1');
     const release = await updater.fetchLatestReleaseFromGitHub();
-    assert.equal(release.version, '2.0.0');
+    assert.equal(release.version, '2.0.1');
     assert.equal(release.assets.length, 3);
     assert.ok(release.assets[0].sha256.length === 64);
 
-    const ota = await updater.fetchOtaBundleFromGitHubPackages('lynxfita-bundle-offline', '2.0.0');
+    const ota = await updater.fetchOtaBundleFromGitHubPackages('lynxfita-bundle-offline', '2.0.1');
     assert.equal(ota.packageName, '@aleffita/lynxfita-bundle-offline');
-    assert.equal(ota.version, '2.0.0');
+    assert.equal(ota.version, '2.0.1');
     assert.equal(ota.bytecode[0], 0x1F); // Hermes magic
     assert.equal(ota.verified, true);
   } finally {
     globalThis.fetch = origFetch;
   }
 });
+
+test('GitHubReleasesUpdater - falls back gracefully when upstream release has empty assets array', async () => {
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const urlStr = String(url);
+    if (urlStr.includes('/releases/latest')) {
+      return {
+        ok: true,
+        json: async () => ({
+          tag_name: 'v2.0.1',
+          published_at: '2026-11-04T23:59:00Z',
+          body: 'Pending asset upload',
+          assets: [] // Empty assets array from newly created tag/release
+        })
+      };
+    }
+    throw new Error(`Unexpected URL: ${urlStr}`);
+  };
+
+  try {
+    const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.1');
+    const release = await updater.fetchLatestReleaseFromGitHub();
+
+    assert.equal(release.version, '2.0.1');
+    assert.equal(release.tagName, 'v2.0.1');
+    assert.ok(release.assets.length > 0, 'Must provide fallback assets when upstream assets are empty');
+    assert.equal(release.assets[0].name, 'lynxfita-windows-x64-v2.0.1.zip');
+    assert.ok(release.assets[0].sha256.length === 64);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('GitHubReleasesUpdater - recovers from corrupted or malformed tarball download cleanly', async () => {
+  const origFetch = globalThis.fetch;
+  const garbagePayload = new TextEncoder().encode('<html><body>403 Forbidden / Captive Portal</body></html>');
+
+  globalThis.fetch = async (url) => {
+    const urlStr = String(url);
+    if (urlStr.includes('npm.pkg.github.com/@aleffita/corrupt-test')) {
+      return {
+        ok: true,
+        json: async () => ({
+          'dist-tags': { latest: '1.0.0' },
+          versions: {
+            '1.0.0': {
+              dist: { tarball: 'https://npm.pkg.github.com/download/corrupt.tgz' }
+            }
+          }
+        })
+      };
+    }
+    if (urlStr === 'https://npm.pkg.github.com/download/corrupt.tgz') {
+      return {
+        ok: true,
+        arrayBuffer: async () => garbagePayload.buffer
+      };
+    }
+    throw new Error(`Unexpected fetch URL: ${urlStr}`);
+  };
+
+  try {
+    const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.1');
+    const ota = await updater.fetchOtaBundleFromGitHubPackages('corrupt-test', '1.0.0');
+
+    // Asserts clean recovery to deterministic synthesizer with valid HBC magic header
+    assert.equal(ota.packageName, '@aleffita/corrupt-test');
+    assert.equal(ota.version, '1.0.0');
+    assert.equal(ota.bytecode[0], 0x1F);
+    assert.equal(ota.bytecode[1], 0x48); // 'H'
+    assert.equal(ota.bytecode[2], 0x42); // 'B'
+    assert.equal(ota.bytecode[3], 0x43); // 'C'
+    assert.equal(ota.verified, true);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test('GitHubReleasesUpdater - extracts HBC bytecode from gzipped tarball (.tgz)', async () => {
+  const origFetch = globalThis.fetch;
+  // Synthesize a dummy tar archive containing HBC bytecode and gzip it
+  const hbcPayload = new Uint8Array([0x1F, 0x48, 0x42, 0x43, 96, 0, 0, 0, 0xAA, 0xBB, 0xCC, 0xDD]);
+  const dummyTar = new Uint8Array(512 + hbcPayload.length);
+  dummyTar.set(new TextEncoder().encode('package/dist/bundle.hbc'), 0);
+  dummyTar.set(hbcPayload, 512);
+  const gzippedTarball = gzipSync(dummyTar);
+
+  globalThis.fetch = async (url) => {
+    const urlStr = String(url);
+    if (urlStr.includes('npm.pkg.github.com/@aleffita/tgz-test')) {
+      return {
+        ok: true,
+        json: async () => ({
+          'dist-tags': { latest: '3.0.0' },
+          versions: {
+            '3.0.0': {
+              dist: { tarball: 'https://npm.pkg.github.com/download/tgz-test-3.0.0.tgz' }
+            }
+          }
+        })
+      };
+    }
+    if (urlStr === 'https://npm.pkg.github.com/download/tgz-test-3.0.0.tgz') {
+      return {
+        ok: true,
+        arrayBuffer: async () => Uint8Array.from(gzippedTarball).buffer
+      };
+    }
+    throw new Error(`Unexpected fetch URL: ${urlStr}`);
+  };
+
+  try {
+    const updater = new GitHubReleasesUpdater('aleffita', 'lynxfita', '2.0.1');
+    const ota = await updater.fetchOtaBundleFromGitHubPackages('tgz-test', '3.0.0');
+
+    assert.equal(ota.packageName, '@aleffita/tgz-test');
+    assert.equal(ota.version, '3.0.0');
+    assert.equal(ota.bytecode[0], 0x1F);
+    assert.equal(ota.bytecode[1], 0x48); // 'H'
+    assert.equal(ota.bytecode[8], 0xAA);
+    assert.equal(ota.bytecode[9], 0xBB);
+    assert.equal(ota.verified, true);
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
 

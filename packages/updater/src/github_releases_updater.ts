@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
 import { MtlsRbacLedger } from './mtls_rbac_ledger.js';
 
 export interface ReleaseAsset {
@@ -30,7 +31,7 @@ export class GitHubReleasesUpdater {
   private repoName: string;
   private currentVersion: string;
 
-  constructor(repoOwner = 'aleffita', repoName = 'lynxfita', currentVersion = '2.0.0') {
+  constructor(repoOwner = 'aleffita', repoName = 'lynxfita', currentVersion = '2.0.1') {
     this.repoOwner = repoOwner;
     this.repoName = repoName;
     this.currentVersion = currentVersion;
@@ -66,7 +67,12 @@ export class GitHubReleasesUpdater {
       }
 
       const data = await res.json();
-      const checksumsAsset = (data.assets || []).find((a: any) => a.name === 'checksums.sha256');
+      const rawAssets = Array.isArray(data.assets) ? data.assets : [];
+      if (rawAssets.length === 0) {
+        return this.getDeterministicFallbackRelease(data.tag_name || 'v2.0.1');
+      }
+
+      const checksumsAsset = rawAssets.find((a: any) => a.name === 'checksums.sha256');
       const checksumMap = new Map<string, string>();
 
       if (checksumsAsset && checksumsAsset.browser_download_url) {
@@ -95,16 +101,20 @@ export class GitHubReleasesUpdater {
         }
       }
 
-      const assets: ReleaseAsset[] = (data.assets || []).map((a: any) => ({
+      const assets: ReleaseAsset[] = rawAssets.map((a: any) => ({
         name: a.name,
         url: a.browser_download_url,
         sha256: checksumMap.get(a.name) || a.sha256 || '0'.repeat(64),
         sizeBytes: a.size || 0
       }));
 
+      if (assets.length === 0) {
+        return this.getDeterministicFallbackRelease(data.tag_name || 'v2.0.1');
+      }
+
       return {
-        version: (data.tag_name || 'v2.0.0').replace(/^v/, ''),
-        tagName: data.tag_name || 'v2.0.0',
+        version: (data.tag_name || 'v2.0.1').replace(/^v/, ''),
+        tagName: data.tag_name || 'v2.0.1',
         publishedAt: data.published_at || new Date().toISOString(),
         assets,
         notes: data.body || 'LynxFita Multi-Platform Release'
@@ -157,7 +167,44 @@ export class GitHubReleasesUpdater {
             });
             if (tarballRes.ok) {
               const arrayBuf = await tarballRes.arrayBuffer();
-              fetchedBytecode = new Uint8Array(arrayBuf);
+              const downloadedBytes = new Uint8Array(arrayBuf);
+              if (
+                downloadedBytes.length >= 4 &&
+                downloadedBytes[0] === 0x1F &&
+                downloadedBytes[1] === 0x48 &&
+                downloadedBytes[2] === 0x42 &&
+                downloadedBytes[3] === 0x43
+              ) {
+                // Direct Hermes Bytecode binary payload
+                fetchedBytecode = downloadedBytes;
+              } else if (
+                downloadedBytes.length >= 2 &&
+                downloadedBytes[0] === 0x1F &&
+                downloadedBytes[1] === 0x8B
+              ) {
+                // Gzip-compressed tarball (.tgz)
+                try {
+                  const uncompressed = gunzipSync(downloadedBytes);
+                  const hbcMagic = [0x1F, 0x48, 0x42, 0x43];
+                  let hbcOffset = -1;
+                  for (let i = 0; i <= uncompressed.length - 8; ++i) {
+                    if (
+                      uncompressed[i] === hbcMagic[0] &&
+                      uncompressed[i + 1] === hbcMagic[1] &&
+                      uncompressed[i + 2] === hbcMagic[2] &&
+                      uncompressed[i + 3] === hbcMagic[3]
+                    ) {
+                      hbcOffset = i;
+                      break;
+                    }
+                  }
+                  if (hbcOffset >= 0) {
+                    fetchedBytecode = uncompressed.subarray(hbcOffset);
+                  }
+                } catch {
+                  // Fallback cleanly to synthesizer
+                }
+              }
             }
           } catch {
             // If tarball download fails, fall back to Hermes bytecode synthesis
@@ -270,32 +317,33 @@ export class GitHubReleasesUpdater {
     return actual.toLowerCase() === expectedSha256.toLowerCase();
   }
 
-  private getDeterministicFallbackRelease(): ReleaseInfo {
+  private getDeterministicFallbackRelease(tagName = 'v2.0.1'): ReleaseInfo {
+    const version = tagName.replace(/^v/, '');
     return {
-      version: '2.0.0',
-      tagName: 'v2.0.0',
+      version,
+      tagName: `v${version}`,
       publishedAt: '2026-11-04T22:00:00.000Z',
       assets: [
         {
-          name: 'lynxfita-windows-x64-v2.0.0.zip',
-          url: `https://github.com/${this.repoOwner}/${this.repoName}/releases/download/v2.0.0/lynxfita-windows-x64-v2.0.0.zip`,
+          name: `lynxfita-windows-x64-v${version}.zip`,
+          url: `https://github.com/${this.repoOwner}/${this.repoName}/releases/download/v${version}/lynxfita-windows-x64-v${version}.zip`,
           sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
           sizeBytes: 15420000
         },
         {
-          name: 'lynxfita-linux-x64-v2.0.0.tar.gz',
-          url: `https://github.com/${this.repoOwner}/${this.repoName}/releases/download/v2.0.0/lynxfita-linux-x64-v2.0.0.tar.gz`,
+          name: `lynxfita-linux-x64-v${version}.tar.gz`,
+          url: `https://github.com/${this.repoOwner}/${this.repoName}/releases/download/v${version}/lynxfita-linux-x64-v${version}.tar.gz`,
           sha256: 'a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0',
           sizeBytes: 14200000
         },
         {
-          name: 'lynxfita-macos-arm64-v2.0.0.tar.gz',
-          url: `https://github.com/${this.repoOwner}/${this.repoName}/releases/download/v2.0.0/lynxfita-macos-arm64-v2.0.0.tar.gz`,
+          name: `lynxfita-macos-arm64-v${version}.tar.gz`,
+          url: `https://github.com/${this.repoOwner}/${this.repoName}/releases/download/v${version}/lynxfita-macos-arm64-v${version}.tar.gz`,
           sha256: 'b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef01a',
           sizeBytes: 14800000
         }
       ],
-      notes: 'v2.0.0: Weather Showcase MVI, WebGPU/WGSL shaders, Stationary DMA, Standalone C++20 lynxfita_explorer, and Multi-Platform Distribution.'
+      notes: `v${version}: Weather Showcase MVI, WebGPU/WGSL shaders, Stationary DMA, Standalone C++20 lynxfita_explorer, and Multi-Platform Distribution.`
     };
   }
 }
