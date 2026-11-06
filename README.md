@@ -106,7 +106,7 @@ sequenceDiagram
     Hermes->>FFI: Load Dynamic Plugin (NativeFfiLoader)
     FFI->>DMA: Compute SIMD Telemetry at Offset 0x2000
     DMA-->>Hermes: Read Real-Time Telemetry Slots
-    Hermes->>Lynx: Emit Declarative AST (<view>, <text>, <image>)
+    Hermes->>Lynx: Emit Declarative AST (view, text, image)
     Lynx-->>Host: Mount Native Desktop Surface Window
     Host-->>User: Display Active Interactive Window
 ```
@@ -145,8 +145,8 @@ flowchart LR
     classDef native fill:#1e1e2e,stroke:#fab387,stroke-width:2px,color:#cdd6f4
 
     subgraph UI["Declarative Lynx Surface"]
-        View["Lynx View Components (<view>, <text>)"]:::ui
-        Intent["User Action / Trigger (Refresh, Select)"]:::ui
+        View["Lynx View Components (view, text)"]:::ui
+        Intent["User Action or Trigger (Refresh, Select)"]:::ui
     end
 
     subgraph Control["Cordis Control Plane"]
@@ -160,7 +160,7 @@ flowchart LR
     end
 
     View -->|User Interaction| Intent
-    Intent -->|dispatch(intent)| Store
+    Intent -->|Dispatches Intent Action| Store
     Store -->|Pure Reducer Function| State
     State -->|Renders Declarative AST| View
     Store -->|Zero-Copy DMA Synchronization| DMA
