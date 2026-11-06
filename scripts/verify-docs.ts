@@ -126,6 +126,54 @@ for (const file of allFiles) {
   }
 }
 
+// 5. Validate SVG XML entity safety across all docs/ assets
+for (const file of allFiles) {
+  const rel = relative(rootDir, file).replace(/\\/g, '/');
+  if (rel.endsWith('.svg')) {
+    const text = readFileSync(file, 'utf8');
+    if (text.includes('&bull;')) {
+      errors.push(`Prohibited HTML entity '&bull;' in ${rel} (causes GitHub Camo XML parser failure; use '&#8226;' or UTF-8 '•')`);
+    }
+    if (text.includes('&nbsp;')) {
+      errors.push(`Prohibited HTML entity '&nbsp;' in ${rel} (use '&#160;' or standard whitespace)`);
+    }
+  }
+}
+
+// 6. Validate Mermaid diagrams for syntax hazard patterns that break GitHub rendering
+for (const file of allFiles) {
+  const rel = relative(rootDir, file).replace(/\\/g, '/');
+  if (!rel.endsWith('.md') || rel.startsWith('docs/transcripts/')) {
+    continue;
+  }
+  const text = readFileSync(file, 'utf8');
+  const mermaidRegex = /```mermaid\r?\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = mermaidRegex.exec(text)) !== null) {
+    const diagram = match[1];
+    const lines = diagram.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Check for unquoted parentheses or brackets inside edge labels: -->|...|
+      const edgeLabelMatch = /-->\|([^|]*)\|/.exec(line);
+      if (edgeLabelMatch) {
+        const label = edgeLabelMatch[1];
+        if (/[()<>{}]/.test(label)) {
+          errors.push(
+            `Mermaid syntax hazard in ${rel} (line ~${i + 1}): Edge label '|${label}|' contains unescaped delimiter chars '()<>{}'. Use plain alphanumeric text.`
+          );
+        }
+      }
+      // Check for unquoted HTML tags in node label brackets: [<tag>]
+      if (/\[[^"\]]*<[a-zA-Z0-9_-]+>[^"\]]*\]/.test(line)) {
+        errors.push(
+          `Mermaid syntax hazard in ${rel} (line ~${i + 1}): Unquoted HTML tag in node '${line.trim()}'. Wrap label in double quotes.`
+        );
+      }
+    }
+  }
+}
+
 if (errors.length > 0) {
   console.error('[verify:docs] FAILED with errors:');
   for (const err of errors) {
