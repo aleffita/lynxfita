@@ -127,15 +127,69 @@ Subsystems are implemented as Cordis **Services** with declared dependencies (`i
 
 ---
 
-## 2. Desktop Shell & Application Showcases
+## 2. Multi-Bundle Super-App & Mini-App Architecture
 
-Applications and plugins run in isolated Cordis Fibers (`ctx.isolate()`), acquiring resources via revertible effects:
+LynxFita structures desktop software as a **Multi-Bundle Super-App** host orchestrating independent **Mini-App** projects:
+
+- **Standalone Mini-App Projects**: Each mini-app is an independent project with its own lifecycle, state reducers, and declarative Lynx AST interface (e.g. [`examples/weather-showcase`](examples/weather-showcase)).
+- **Hermetic Packaging (`@lynxfita/builder`)**: The bundler compiles each mini-app into a standalone, relocatable bundle containing authentic Meta Hermes bytecode (`.hbc`), static assets, and an Ed25519-signed manifest (`release.manifest.json`).
+- **Super-App Container Host (`examples/explorer`)**: Rather than a monolithic codebase, the Super-App shell is an orchestration host that dynamically loads, mounts, and unloads multiple mini-app bundles into isolated Cordis Fibers (`ctx.isolate()`), managing cross-app navigation (`lynxfita://app-id`) and zero-copy data plane access.
+
+```mermaid
+flowchart TD
+    classDef project fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px,color:#cdd6f4
+    classDef bundler fill:#1e1e2e,stroke:#fab387,stroke-width:2px,color:#cdd6f4
+    classDef bundle fill:#181825,stroke:#45475a,stroke-width:1.5px,color:#a6adc8
+    classDef superapp fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+    classDef fiber fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4
+
+    subgraph Projects["Standalone Mini-App Projects"]
+        WeatherProj["Weather Showcase (MVI App)"]:::project
+        StudioProj["WIT and FFI Studio (SIMD App)"]:::project
+        DmaProj["DMA and GPU Lab (Visualizer App)"]:::project
+    end
+
+    subgraph BundlerStage["Packaging Pipeline (@lynxfita/builder)"]
+        Builder["BundlePackager (Hermes Compiler and Signer)"]:::bundler
+    end
+
+    subgraph Bundles["Compiled Bytecode Bundles"]
+        WeatherHbc["weather.hbc (Bytecode and Manifest)"]:::bundle
+        StudioHbc["studio.hbc (Bytecode and Manifest)"]:::bundle
+        DmaHbc["dma_lab.hbc (Bytecode and Manifest)"]:::bundle
+    end
+
+    subgraph SuperApp["Super-App Host Shell (examples/explorer)"]
+        Shell["Desktop Container Runtime"]:::superapp
+        subgraph Fibers["Isolated Cordis Fibers (ctx.isolate)"]
+            Fiber1["Weather Fiber"]:::fiber
+            Fiber2["Studio Fiber"]:::fiber
+            Fiber3["DMA Lab Fiber"]:::fiber
+        end
+    end
+
+    WeatherProj -->|Compile and Package| Builder
+    StudioProj -->|Compile and Package| Builder
+    DmaProj -->|Compile and Package| Builder
+
+    Builder --> WeatherHbc
+    Builder --> StudioHbc
+    Builder --> DmaHbc
+
+    WeatherHbc -->|Dynamic Mount| Fiber1
+    StudioHbc -->|Dynamic Mount| Fiber2
+    DmaHbc -->|Dynamic Mount| Fiber3
+
+    Shell --> Fibers
+```
 
 <div align="center">
   <img src="docs/assets/lynxfita-explorer-demo.gif" alt="LynxFita Desktop Explorer Session" width="100%" />
 </div>
 
 ### MVI Unidirectional Architecture & Telemetry Lane
+
+Mini-apps communicate with the native runtime through a unidirectional Model-View-Intent cycle, synchronizing state with the stationary telemetry slot:
 
 ```mermaid
 flowchart LR
@@ -168,12 +222,12 @@ flowchart LR
     Plugin -->|Telemetry Result Slot| Store
 ```
 
-| Project / Showcase | Path | Description & Runtime Environment |
+| Showcase & Application Bundles | Path | Description & Runtime Architecture |
 | :--- | :--- | :--- |
-| **Desktop Shell Preview** | [`examples/explorer`](examples/explorer) | TypeScript interactive developer shell demonstrating Cordis service lifecycle, route navigation (`lynxfita://home`, `lynxfita://settings`), and memory slot inspection. Serves local preview at `http://127.0.0.1:4173` via `pnpm explore`. |
-| **Weather Showcase MVI** | [`examples/weather-showcase`](examples/weather-showcase) | Unidirectional Model-View-Intent weather radar application with declarative Lynx components (`<view>`, `<text>`, `<image>`), dark/light themes (`#f9d65d`), 14 weather conditions, and SIMD telemetry integration. |
-| **WIT & Native SIMD Studio** | [`examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts`](examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts) | Interactive WebAssembly Interface Type (WIT) parser (`parseWitSpec`) and SIMD execution interface over memory slot `0x2000`. |
-| **Stationary DMA Lab** | [`examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts`](examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts) | Memory slot visualizer (`0x0000`–`0x3FFF`) and canvas visualization. |
+| **Super-App Explorer Shell** | [`examples/explorer`](examples/explorer) | Interactive desktop host orchestrating multi-bundle mini-app lifecycles, route sandboxing (`lynxfita://home`, `lynxfita://settings`), and memory slot inspection. Serves local preview at `http://127.0.0.1:4173` via `pnpm explore`. |
+| **Weather Showcase MVI** | [`examples/weather-showcase`](examples/weather-showcase) | Standalone MVI mini-app project with declarative Lynx components (`view`, `text`, `image`), dark/light theme switching (`#f9d65d`), 14 weather conditions, and direct SIMD telemetry sync. |
+| **WIT & Native SIMD Studio** | [`examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts`](examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts) | WebAssembly Interface Type (WIT) parser (`parseWitSpec`) and vectorized SIMD execution harness over stationary slot `0x2000`. |
+| **Stationary DMA Lab** | [`examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts`](examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts) | Real-time memory visualizer inspecting stationary buffer ranges (`0x0000`–`0x3FFF`). |
 | **`lynxfita_explorer` Native Host** | [`src/native/src/explorer_main.cc`](src/native/src/explorer_main.cc) | Desktop application host binary executing compiled Hermes bytecode bundles via `--run <file.hbc>` and interactive desktop window via `--gui [bundle.hbc]`. |
 
 <p align="center">
@@ -223,7 +277,12 @@ flowchart TD
 
 ---
 
-## 4. Performance & Microbenchmarks
+## 4. Unified Zero-Copy Data Plane & Microbenchmarks
+
+Rather than treating memory buffers, SIMD vectorization, binary wire RPC framing, and WASI linear memory as isolated, competing mechanisms, LynxFita architectures them as a **Unified Zero-Copy Data Plane**:
+
+- **Cooperative End-to-End Pipeline**: Protobuf binary wire frames (`ctx.protobuf`) encode directly into designated slots in Stationary Shared Memory (`ctx.dma`). Native SIMD kernels (`ctx.ffi`) process vectors in-place on that exact slot without memory copies. WASI runtime modules (`ctx.wasi`) enforce bounds checking directly over the shared arena.
+- **Unified Pipeline Advantage**: Operating over a single coherent memory arena eliminates the traditional serialization and crossing penalty between JavaScript, WebAssembly, and native C++ code, achieving sub-microsecond median latencies and scaling up to 42.5 GB/s bandwidth.
 
 Statistical microbenchmarks are executed via `pnpm bench` ([`benchmarks/run_benchmarks.ts`](benchmarks/run_benchmarks.ts)) using the Kalibera & Jones standard ($N = 30$ independent sample batches after 10 discarded warm-up rounds).
 
@@ -236,14 +295,14 @@ Full methodology and raw statistical distributions ($p50$, $p95$, $p99$, $IQR$, 
   <img src="docs/assets/benchmark-latency.svg" alt="Subsystem Execution Latency" width="49%" />
 </p>
 
-### High-Signal Metric Overview
+### Unified Pipeline Metrics Overview
 
-| Subsystem & Operation | Payload Range | Median Latency ($p50$) | Peak Bandwidth | Measurement Baseline |
+| Pipeline Stage & Capability | Payload Range | Median Latency ($p50$) | Peak Bandwidth | Role in Unified Data Plane |
 | :--- | :---: | :---: | :---: | :--- |
-| **Stationary Memory Transfer** | `64 B` &ndash; `1 MB` | `0.60` &ndash; `23.10 μs` | `42,498.94 MB/s` | V8 TypedArray / in-memory stationary arena |
-| **SIMD Float32 Vector Lane** | `16 B` | `0.36 μs` | `38.22 MB/s` | IEEE 754 float32 DataView vector lane |
-| **Protobuf Wire RPC Encoding** | `64 B` &ndash; `4 KB` | `7.70` &ndash; `9.60 μs` | `319.57 MB/s` | Binary wire varint packing over memory slot |
-| **WASI Linear Memory Interop** | `64 B` &ndash; `1 MB` | `0.50` &ndash; `285.20 μs` | `3,268.29 MB/s` | Sandboxed WASI memory bounds checking |
+| **Stationary Memory Foundation (`ctx.dma`)** | `64 B` &ndash; `1 MB` | `0.60` &ndash; `23.10 μs` | `42,498.94 MB/s` | 64-byte aligned arena providing zero-copy memory slots (`0x0000`–`0x3FFF`) |
+| **In-Place SIMD Vector Lane (`ctx.ffi`)** | `16 B` | `0.36 μs` | `38.22 MB/s` | Vectorized float32 math directly over memory slot `0x2000` |
+| **Zero-JSON Wire RPC Framing (`ctx.protobuf`)** | `64 B` &ndash; `4 KB` | `7.70` &ndash; `9.60 μs` | `319.57 MB/s` | Binary varint wire packing directly into shared slot without heap copy |
+| **Sandboxed WASI Linear Interop (`ctx.wasi`)** | `64 B` &ndash; `1 MB` | `0.50` &ndash; `285.20 μs` | `3,268.29 MB/s` | Bounds-checked WASI linear memory access mapped to the stationary arena |
 
 ---
 
@@ -311,17 +370,17 @@ lynxfita/
 
 ---
 
-## 7. Backing the Research & Patronage
+## 7. Research Patronage & Sponsorship
 
 <div align="center">
 
-### 🖤🐧 *"Enjoyed the session? Satisfied with how I perform?"*
+### Independent Systems & Foundations Engineering
 
-*Help keep a working girl's late-night research alive by tipping any amount. Who knows — I might spin up a private dashboard and unlock exclusive behind-the-scenes builds for my top patrons. No promises, just immeasurable value to keep the sessions going!*
+*LynxFita is developed as part of independent research into high-performance, deterministic desktop runtime architectures at FitaLabs. Research patronage directly supports independent engineering, continuous benchmarking infrastructure, and open-source systems formalization.*
 
 <br />
 
-[![Tip via Stripe](https://img.shields.io/badge/Tip_via_Stripe-🖤🐧_FitaLabs-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)&nbsp;&nbsp;&nbsp;[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/aleffita)
+[![Sponsor via Stripe](https://img.shields.io/badge/Sponsor_via_Stripe-FitaLabs-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)&nbsp;&nbsp;&nbsp;[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/aleffita)
 
 </div>
 

@@ -66,8 +66,7 @@ function generateThroughputSvg(): string {
     `;
   });
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 310" width="100%" height="100%">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 310" width="100%" height="100%">
   <defs>
     <linearGradient id="grad-tp-0" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#89dceb" />
@@ -92,7 +91,7 @@ function generateThroughputSvg(): string {
 
   <!-- Header -->
   <text x="24" y="34" fill="${C.text}" font-size="15" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Memory Transfer Throughput Scaling</text>
-  <text x="24" y="52" fill="${C.textSub}" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Bandwidth scaling across payload sizes (MB/s &bull; Higher is better)</text>
+  <text x="24" y="52" fill="${C.textSub}" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Bandwidth scaling across payload sizes (MB/s &#8226; Higher is better)</text>
   
   <!-- Pill badge -->
   <rect x="382" y="20" width="94" height="20" rx="10" fill="#313244" />
@@ -146,14 +145,13 @@ function generateLatencySvg(): string {
     `;
   });
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 310" width="100%" height="100%">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 310" width="100%" height="100%">
   <!-- Container Box -->
   <rect width="500" height="310" rx="10" fill="${C.bg}" stroke="${C.border}" stroke-width="1" />
 
   <!-- Header -->
   <text x="24" y="34" fill="${C.text}" font-size="15" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Subsystem Execution Latency (p50)</text>
-  <text x="24" y="52" fill="${C.textSub}" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Median execution time (microseconds &bull; Lower is faster)</text>
+  <text x="24" y="52" fill="${C.textSub}" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Median execution time (microseconds &#8226; Lower is faster)</text>
 
   <!-- Legend Tags -->
   <g transform="translate(295, 20)">
