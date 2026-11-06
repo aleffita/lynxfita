@@ -23,6 +23,8 @@ test('runDoctor inspects platform, stationary DMA, and WASI sandbox', () => {
   assert.equal(doc.checks.nodeVersionGte20, true);
   assert.equal(doc.checks.stationaryDmaIntegrity, true);
   assert.equal(doc.checks.wasiSandboxIntegrity, true);
+  assert.equal(doc.checks.cmakeToolchain, true);
+  assert.equal(doc.checks.hermesCompiler, true);
   assert.equal(typeof doc.details.dmaArena, 'string');
 });
 
@@ -76,6 +78,9 @@ test('packProject packages self-contained desktop target with Ed25519 signature'
   assert.ok(existsSync(result.manifestFile));
   assert.ok(existsSync(result.releaseManifestFile));
   assert.ok(existsSync(result.signatureFile));
+  assert.ok(existsSync(join(result.packageDir, 'run.cmd')));
+  assert.ok(existsSync(join(result.packageDir, 'AppRun')));
+  assert.ok(existsSync(join(result.packageDir, 'lynxfita.app.json')));
   assert.ok(result.output.includes('Packaged self-contained desktop target'));
 });
 

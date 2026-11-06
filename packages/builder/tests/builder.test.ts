@@ -61,11 +61,22 @@ test('SelfContainedPackager packages hermetic distribution with Ed25519 signatur
   assert.ok(existsSync(result.releaseManifestPath));
   assert.ok(existsSync(result.signaturePath));
   assert.ok(existsSync(result.publicKeyPath));
+  assert.ok(existsSync(result.runCmdPath));
+  assert.ok(existsSync(result.appRunPath));
+  assert.ok(existsSync(join(result.packageDir, 'lynxfita.app.json')));
+
   assert.equal(typeof result.signature, 'string');
   assert.ok(result.signature.length > 64);
 
   const releaseJson = JSON.parse(readFileSync(result.releaseManifestPath, 'utf8'));
   assert.equal(releaseJson.appName, 'desktop-test-app');
-  assert.equal(releaseJson.files.length, 2);
+  assert.ok(releaseJson.files.length >= 5);
+
+  const manifestFilePaths = releaseJson.files.map((f: { path: string }) => f.path);
+  assert.ok(manifestFilePaths.includes('bundles/desktop-test-app.hbc'));
+  assert.ok(manifestFilePaths.includes('bundles/bundle.manifest.json'));
+  assert.ok(manifestFilePaths.includes('run.cmd'));
+  assert.ok(manifestFilePaths.includes('AppRun'));
+  assert.ok(manifestFilePaths.includes('lynxfita.app.json'));
 });
 

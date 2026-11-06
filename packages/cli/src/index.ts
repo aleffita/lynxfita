@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, join, basename } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { parseTypeScriptSpec, JsiCodeGenerator } from '@lynxfita/codegen';
-import { BundlePackager, SelfContainedPackager } from '@lynxfita/builder';
+import { BundlePackager, SelfContainedPackager, resolveHermescBinary } from '@lynxfita/builder';
 import { StationaryDmaClient } from '@lynxfita/core';
 import { WasiHostContext } from '@lynxfita/wasi-runtime';
 
@@ -475,6 +476,36 @@ export function runDoctor(): DoctorResult {
     : null;
   const packagesOk = pkgDir !== null && existsSync(join(pkgDir, 'core'));
 
+  // 5. Native toolchain check: CMake
+  let cmakeOk = false;
+  let cmakeDetail = 'not found';
+  try {
+    const out = execFileSync('cmake', ['--version'], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    const match = out.match(/cmake version (\d+\.\d+\.\d+)/);
+    if (match) {
+      cmakeOk = true;
+      cmakeDetail = `CMake v${match[1]} operational`;
+    } else {
+      cmakeOk = true;
+      cmakeDetail = 'CMake operational';
+    }
+  } catch {
+    cmakeOk = false;
+    cmakeDetail = 'CMake not found in PATH';
+  }
+
+  // 6. Native toolchain check: Meta Hermes Bytecode Compiler (hermesc)
+  const hermescPath = resolveHermescBinary();
+  const hermescOk = Boolean(hermescPath && existsSync(hermescPath));
+  const hermesVendorOk =
+    existsSync(join(repoRoot, 'vendor', 'hermes')) ||
+    existsSync(join(repoRoot, '..', '..', 'vendor', 'hermes'));
+  const hermescDetail = hermescOk
+    ? `hermesc operational at ${hermescPath}`
+    : hermesVendorOk
+    ? 'vendor/hermes source available (build with cmake to produce hermesc binary)'
+    : 'Hermes compiler not found';
+
   const checks: Record<string, boolean> = {
     nodeVersionGte20: nodeMajor >= 20,
     hasSupportedPlatform: ['win32', 'linux', 'darwin'].includes(process.platform),
@@ -482,7 +513,9 @@ export function runDoctor(): DoctorResult {
     stationaryDmaIntegrity: dmaOk,
     wasiSandboxIntegrity: wasiOk,
     vendorSubmodulesIntegrity: submodulesOk,
-    workspacePackagesIntegrity: packagesOk
+    workspacePackagesIntegrity: packagesOk,
+    cmakeToolchain: cmakeOk,
+    hermesCompiler: hermescOk || hermesVendorOk
   };
 
   const details: Record<string, string> = {
@@ -491,7 +524,9 @@ export function runDoctor(): DoctorResult {
     dmaArena: dmaOk ? 'Stationary 64KB SIMD buffer operational' : 'Allocation failed',
     wasiSandbox: wasiOk ? 'Linear memory sandbox operational' : 'WASI initialization failed',
     submodules: submodulesOk ? 'Vendor submodules verified' : 'Vendor submodules missing',
-    packages: packagesOk ? 'Workspace packages verified' : 'Workspace packages missing'
+    packages: packagesOk ? 'Workspace packages verified' : 'Workspace packages missing',
+    cmake: cmakeDetail,
+    hermesCompiler: hermescDetail
   };
 
   const ok = Object.values(checks).every(Boolean);
