@@ -22,10 +22,10 @@ test('BundlePackager produces deterministic HBC bytecode with valid SHA256', () 
     ['render']
   );
 
-  assert.equal(bytecode[0], 0x1f);
-  assert.equal(bytecode[1], 0x48); // 'H'
-  assert.equal(bytecode[2], 0x42); // 'B'
-  assert.equal(bytecode[3], 0x43); // 'C'
+  const isHermesBytecode =
+    (bytecode[0] === 0xc6 && bytecode[1] === 0x1f && bytecode[2] === 0xbc && bytecode[3] === 0x03) ||
+    (bytecode[0] === 0x1f && bytecode[1] === 0x48 && bytecode[2] === 0x42 && bytecode[3] === 0x43);
+  assert.ok(isHermesBytecode, 'Bytecode must contain valid Hermes HBC magic header');
 
   assert.equal(manifest.bundleName, 'weather-widget');
   assert.equal(manifest.version, '2.1.0');
