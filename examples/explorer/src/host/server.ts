@@ -106,6 +106,51 @@ export function startExplorerServer(port = 4173): Promise<{ close: () => Promise
               return;
             }
 
+            if (url.pathname === '/api/cockpit/tab') {
+              await explorer.ensureMiniAppLaunched('developer-cockpit');
+              const store = explorer.getCockpitStore();
+              if (store && data.tab) {
+                store.setTab(data.tab);
+              }
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, tab: data.tab }));
+              return;
+            }
+
+            if (url.pathname === '/api/cockpit/reconcile') {
+              await explorer.ensureMiniAppLaunched('developer-cockpit');
+              const store = explorer.getCockpitStore();
+              if (store) {
+                await store.reconcileRemoteBundle(Boolean(data.simulateTampering));
+              }
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, state: store?.getState() }));
+              return;
+            }
+
+            if (url.pathname === '/api/cockpit/compile') {
+              await explorer.ensureMiniAppLaunched('developer-cockpit');
+              const store = explorer.getCockpitStore();
+              if (store) {
+                store.compileSnippet(data.source);
+              }
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, compiler: store?.getState().compiler }));
+              return;
+            }
+
+            if (url.pathname === '/api/cockpit/a2ui/action') {
+              await explorer.ensureMiniAppLaunched('developer-cockpit');
+              const store = explorer.getCockpitStore();
+              if (store && data.componentId) {
+                await store.getRenderer().dispatchAction(data.componentId, data.actionKey || 'onPress', data.payload);
+                explorer.historyManager.log('genui', `Dispatched A2UI action '${data.actionKey || 'onPress'}' on component '${data.componentId}'`);
+              }
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true }));
+              return;
+            }
+
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Endpoint not found' }));
           } catch (err: any) {

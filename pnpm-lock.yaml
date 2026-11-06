@@ -194,6 +194,8 @@ importers:
         specifier: ^5.8.2
         version: 5.9.3
 
+  examples/plugins/weather-simd: {}
+
   examples/weather-showcase: {}
 
   packages/builder:
@@ -215,6 +217,12 @@ importers:
         version: 5.9.3
 
   packages/core:
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+
+  packages/genui:
     devDependencies:
       typescript:
         specifier: ^5.8.2

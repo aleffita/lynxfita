@@ -4,7 +4,7 @@
 
 export interface TelemetryLogEvent {
   timestamp: number;
-  category: 'navigation' | 'cordis' | 'dma' | 'ffi' | 'wasi' | 'mtls';
+  category: 'navigation' | 'cordis' | 'dma' | 'ffi' | 'wasi' | 'mtls' | 'genui';
   message: string;
   data?: any;
 }

@@ -15,7 +15,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "node --experimental-strip-types --test tests/explorer.test.ts",
+    "test": "node --experimental-strip-types --test tests/explorer.test.ts tests/cockpit.test.ts",
     "test:e2e": "node --experimental-strip-types --test tests/explorer-browser.e2e.test.ts"
   },
   "devDependencies": {

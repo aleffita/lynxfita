@@ -27,6 +27,7 @@ This directory contains the public SDK and tooling packages published under `@al
 | **[`@lynxfita/wasi-runtime`](file:///j:/limiar/packages/lynxfita/packages/wasi-runtime)** | `ctx.wasi` (`WasiComponentService`) | Mounts `.wasm` modules and WIT component bindings onto `LynxFitaContext` with direct zero-copy views into `ctx.dma` and capability-scoped filesystem/device descriptors. |
 | **[`@lynxfita/builder`](file:///j:/limiar/packages/lynxfita/packages/builder)** | Bundler & Packager | Builds Static Hermes `.hbc` bundles, packages self-contained executables and bundles, emits `release.manifest.json` and Ed25519 signatures for release integrity, and serves local dev HMR. |
 | **[`@lynxfita/updater`](file:///j:/limiar/packages/lynxfita/packages/updater)** | `ctx.federation` | Ed25519 release integrity, SHA-256 payload verification, GitHub Releases integration, and Module Federation/OTA reconciler with automatic Cordis Fiber rollback to embedded baseline on signature mismatch. |
+| **[`@lynxfita/genui`](file:///j:/limiar/packages/lynxfita/packages/genui)** | `ctx.genui` | ByteDance/Lynx A2UI v0.9 specification, catalog-constrained dynamic agent surface, reactive data bindings, and action routing. |
 | **[`@lynxfita/cli`](file:///j:/limiar/packages/lynxfita/packages/cli)** | CLI (`lynxfita`) | Cross-platform developer entrypoint (`doctor`, `build`, `pack`, `init`, `explore`, `dev`, `codegen`, `bench`). |
 
 ## Rules

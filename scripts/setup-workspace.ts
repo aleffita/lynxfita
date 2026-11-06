@@ -24,6 +24,7 @@ const WORKSPACE_PACKAGES: readonly WorkspaceEntry[] = [
   { localScopeName: '@lynxfita/builder', publishScopeName: '@aleffita/lynxfita-builder', relDir: 'packages/builder' },
   { localScopeName: '@lynxfita/updater', publishScopeName: '@aleffita/lynxfita-updater', relDir: 'packages/updater' },
   { localScopeName: '@lynxfita/cli', publishScopeName: '@aleffita/lynxfita-cli', relDir: 'packages/cli' },
+  { localScopeName: '@lynxfita/genui', publishScopeName: '@aleffita/lynxfita-genui', relDir: 'packages/genui' },
   { localScopeName: '@lynxfita/example-weather-showcase', publishScopeName: '@aleffita/lynxfita-bundle-weather-showcase', relDir: 'examples/weather-showcase' },
   { localScopeName: '@lynxfita/example-plugin-weather-simd', publishScopeName: '@aleffita/lynxfita-example-plugin-weather-simd', relDir: 'examples/plugins/weather-simd' },
   { localScopeName: '@lynxfita/explorer', publishScopeName: '@aleffita/lynxfita-explorer', relDir: 'examples/explorer' },

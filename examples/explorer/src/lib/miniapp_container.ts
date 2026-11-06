@@ -27,6 +27,7 @@ export interface MiniAppInstance {
   onUnload: () => Promise<void> | void;
   renderHtml: () => string;
   dispatch?: ((intent: any) => Promise<any> | any) | undefined;
+  appLogic?: any;
 }
 
 export class MiniAppContainerManager {
@@ -82,7 +83,8 @@ export class MiniAppContainerManager {
         await fiber._unload();
       },
       renderHtml: appLogic.renderHtml,
-      dispatch: appLogic.dispatch
+      dispatch: appLogic.dispatch,
+      appLogic
     };
 
     await instance.onLaunch();

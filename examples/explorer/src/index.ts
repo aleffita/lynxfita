@@ -23,6 +23,7 @@ import { renderSettingsPage, type SettingsViewState } from './homepage/SettingsP
 import { createWeatherMiniApp, WEATHER_MINIAPP_META } from './miniapps/weather_miniapp.js';
 import { createWitFfiStudioMiniApp, WIT_FFI_STUDIO_META } from './miniapps/wit_ffi_studio_miniapp.js';
 import { createDmaGpuLabMiniApp, DMA_GPU_LAB_META } from './miniapps/dma_gpu_lab_miniapp.js';
+import { createCockpitMiniApp, COCKPIT_MINIAPP_META, CockpitStore } from './miniapps/cockpit_miniapp.js';
 
 export interface SuperAppConfig {
   context?: LynxFitaContext;
@@ -115,7 +116,15 @@ export class SuperAppExplorer {
     } else if (appId === 'dma-gpu-lab') {
       await this.containerManager.launchMiniApp(DMA_GPU_LAB_META, ctx => createDmaGpuLabMiniApp(ctx));
       this.historyManager.log('cordis', 'Mounted Mini-App dma-gpu-lab in child Fiber');
+    } else if (appId === 'developer-cockpit') {
+      await this.containerManager.launchMiniApp(COCKPIT_MINIAPP_META, ctx => createCockpitMiniApp(ctx));
+      this.historyManager.log('cordis', 'Mounted Mini-App developer-cockpit in child Fiber');
     }
+  }
+
+  public getCockpitStore(): CockpitStore | undefined {
+    const instance = this.containerManager.getInstance('developer-cockpit');
+    return instance?.appLogic ? instance.appLogic.store : undefined;
   }
 
   public getSettingsState(): SettingsViewState {
@@ -268,6 +277,65 @@ export class SuperAppExplorer {
         body: JSON.stringify(intent)
       }).then(() => window.location.reload());
     };
+
+    // Cockpit, Remote Federation & A2UI Bridges
+    window.cockpitSetTab = function(tab) {
+      fetch('/api/cockpit/tab', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tab: tab })
+      }).then(() => window.location.reload());
+    };
+
+    window.cockpitReconcileRemote = function(simulateTampering) {
+      fetch('/api/cockpit/reconcile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ simulateTampering: simulateTampering })
+      }).then(() => window.location.reload());
+    };
+
+    window.cockpitCompileSnippet = function() {
+      const src = document.getElementById('compiler-source');
+      fetch('/api/cockpit/compile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: src ? src.value : undefined })
+      }).then(() => window.location.reload());
+    };
+
+    window.cockpitDispatchA2Ui = function(componentId, actionKey, payload) {
+      fetch('/api/cockpit/a2ui/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ componentId: componentId, actionKey: actionKey, payload: payload })
+      }).then(() => window.location.reload());
+    };
+
+    document.addEventListener('click', function(e) {
+      const tabBtn = e.target.closest('.cockpit-tab-btn');
+      if (tabBtn && tabBtn.dataset.tab) {
+        window.cockpitSetTab(tabBtn.dataset.tab);
+        return;
+      }
+      if (e.target.id === 'btn-reconcile-remote') {
+        window.cockpitReconcileRemote(false);
+        return;
+      }
+      if (e.target.id === 'btn-reconcile-tampered') {
+        window.cockpitReconcileRemote(true);
+        return;
+      }
+      if (e.target.id === 'btn-compile-now') {
+        window.cockpitCompileSnippet();
+        return;
+      }
+      const a2uiBtn = e.target.closest('[data-a2ui-action]');
+      if (a2uiBtn && a2uiBtn.dataset.a2uiAction) {
+        window.cockpitDispatchA2Ui(a2uiBtn.dataset.a2uiAction, 'onPress');
+        return;
+      }
+    });
   </script>
 </body>
 </html>`;

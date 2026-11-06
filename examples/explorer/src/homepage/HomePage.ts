@@ -19,6 +19,15 @@ export interface MiniAppGridCard {
 
 export const REGISTERED_MINIAPPS: readonly MiniAppGridCard[] = [
   {
+    id: 'developer-cockpit',
+    name: 'Developer & Agent Cockpit',
+    category: 'Multi-Repo / GenUI',
+    icon: '🛠️',
+    description: 'Multi-repo orchestrator, remote OTA federation reconciler, GenUI A2UI canvas & Hermes compiler studio.',
+    route: 'lynxfita://miniapp/developer-cockpit',
+    tag: 'DX Spine'
+  },
+  {
     id: 'weather-showcase',
     name: 'Weather Showcase',
     category: 'MVI Reactive UI',
