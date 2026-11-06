@@ -63,21 +63,21 @@ flowchart TD
     end
 
     Launchers -->|Spawns Host Process| NativeEngine
-    NativeEngine -->|1. Verifies Signature| Verifier
+    NativeEngine -->|Verifies Signature| Verifier
     Signature -->|Signature Bytes| Verifier
     Manifest -->|Payload Hashes| Verifier
-    Verifier -->|2. Validates Integrity| AppJson
-    AppJson -->|3. Configures Context| NativeEngine
-    NativeEngine -->|4. Allocates Stationary Memory| DmaArena
-    NativeEngine -->|5. Initializes Engine| MetaHermes
-    NativeEngine -->|6. Mounts Dynamic Loader| FfiLoader
+    Verifier -->|Validates Integrity| AppJson
+    AppJson -->|Configures Context| NativeEngine
+    NativeEngine -->|Allocates Stationary Memory| DmaArena
+    NativeEngine -->|Initializes Engine| MetaHermes
+    NativeEngine -->|Mounts Dynamic Loader| FfiLoader
     Bytecode -->|Maps HBC Payload| MetaHermes
     Plugins -->|Loads Shared Libraries| FfiLoader
     Assets -->|Supplies UI Resources| LynxSurface
     FfiLoader <-->|SIMD Operations| DmaArena
     MetaHermes <-->|JSI HostObject Bridge| DmaArena
-    MetaHermes -->|7. Evaluates UI Tree| LynxSurface
-    LynxSurface -->|8. Renders Native View| NativeEngine
+    MetaHermes -->|Evaluates UI Tree| LynxSurface
+    LynxSurface -->|Renders Native View| NativeEngine
 ```
 
 ### Runtime Execution Lifecycle
@@ -208,12 +208,12 @@ flowchart TD
         Baseline["Deterministic Rollback (Embedded Baseline)"]:::rollback
     end
 
-    Packager -->|1. Computes SHA-256 Digests| Manifest
-    Packager -->|2. Signs with Private Key| Sig
+    Packager -->|Computes SHA-256 Digests| Manifest
+    Packager -->|Signs with Private Key| Sig
     Manifest -->|Payload Hashes| Verify
     Sig -->|Signature Data| Verify
-    Verify -->|3a. Signature Valid & Digests Match| Stage
-    Verify -->|3b. Invalid Signature or Digest Mismatch| Baseline
+    Verify -->|Signature Valid and Hashes Match| Stage
+    Verify -->|Invalid Signature or Hash Mismatch| Baseline
     Stage -->|Disposer on Unload| Baseline
 ```
 
