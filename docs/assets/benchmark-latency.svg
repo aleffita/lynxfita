@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 310" width="100%" height="100%">
+  <!-- Container Box -->
+  <rect width="500" height="310" rx="10" fill="#181825" stroke="#313244" stroke-width="1" />
+
+  <!-- Header -->
+  <text x="24" y="34" fill="#cdd6f4" font-size="15" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Subsystem Execution Latency (p50)</text>
+  <text x="24" y="52" fill="#a6adc8" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Median execution time (microseconds &bull; Lower is faster)</text>
+
+  <!-- Legend Tags -->
+  <g transform="translate(295, 20)">
+    <circle cx="8" cy="10" r="4" fill="#a6e3a1" />
+    <text x="16" y="14" fill="#a6adc8" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">SIMD</text>
+    <circle cx="50" cy="10" r="4" fill="#74c7ec" />
+    <text x="58" y="14" fill="#a6adc8" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Mem</text>
+    <circle cx="88" cy="10" r="4" fill="#89dceb" />
+    <text x="96" y="14" fill="#a6adc8" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">WASI</text>
+    <circle cx="132" cy="10" r="4" fill="#fab387" />
+    <text x="140" y="14" fill="#a6adc8" font-size="9" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Proto</text>
+  </g>
+
+  <!-- Grid line -->
+  <line x1="24" y1="68" x2="476" y2="68" stroke="#313244" stroke-width="1" />
+
+  
+      <!-- Row 1: SIMD Float32 (16B) -->
+      <text x="147" y="96" fill="#cdd6f4" font-size="11" font-weight="500" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">SIMD Float32 (16B)</text>
+      <rect x="155" y="84" width="220" height="16" rx="4" fill="#11111b" />
+      <rect x="155" y="84" width="26" height="16" rx="4" fill="#a6e3a1" />
+      <text x="189" y="96" fill="#cdd6f4" font-size="11" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">0.36 μs</text>
+    
+      <!-- Row 2: WASI Bounds (64B) -->
+      <text x="147" y="120" fill="#cdd6f4" font-size="11" font-weight="500" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">WASI Bounds (64B)</text>
+      <rect x="155" y="108" width="220" height="16" rx="4" fill="#11111b" />
+      <rect x="155" y="108" width="31" height="16" rx="4" fill="#89dceb" />
+      <text x="194" y="120" fill="#cdd6f4" font-size="11" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">0.50 μs</text>
+    
+      <!-- Row 3: Memory Buf (64B) -->
+      <text x="147" y="144" fill="#cdd6f4" font-size="11" font-weight="500" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Memory Buf (64B)</text>
+      <rect x="155" y="132" width="220" height="16" rx="4" fill="#11111b" />
+      <rect x="155" y="132" width="34" height="16" rx="4" fill="#74c7ec" />
+      <text x="197" y="144" fill="#cdd6f4" font-size="11" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">0.60 μs</text>
+    
+      <!-- Row 4: Memory Buf (64KB) -->
+      <text x="147" y="168" fill="#cdd6f4" font-size="11" font-weight="500" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Memory Buf (64KB)</text>
+      <rect x="155" y="156" width="220" height="16" rx="4" fill="#11111b" />
+      <rect x="155" y="156" width="56" height="16" rx="4" fill="#b4befe" />
+      <text x="219" y="168" fill="#cdd6f4" font-size="11" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">1.60 μs</text>
+    
+      <!-- Row 5: Protobuf Wire (64B) -->
+      <text x="147" y="192" fill="#cdd6f4" font-size="11" font-weight="500" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Protobuf Wire (64B)</text>
+      <rect x="155" y="180" width="220" height="16" rx="4" fill="#11111b" />
+      <rect x="155" y="180" width="122" height="16" rx="4" fill="#fab387" />
+      <text x="285" y="192" fill="#cdd6f4" font-size="11" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">7.70 μs</text>
+    
+      <!-- Row 6: Protobuf Wire (4KB) -->
+      <text x="147" y="216" fill="#cdd6f4" font-size="11" font-weight="500" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Protobuf Wire (4KB)</text>
+      <rect x="155" y="204" width="220" height="16" rx="4" fill="#11111b" />
+      <rect x="155" y="204" width="136" height="16" rx="4" fill="#f9e2af" />
+      <text x="299" y="216" fill="#cdd6f4" font-size="11" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">9.60 μs</text>
+    
+      <!-- Row 7: WASI Interop (64KB) -->
+      <text x="147" y="240" fill="#cdd6f4" font-size="11" font-weight="500" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">WASI Interop (64KB)</text>
+      <rect x="155" y="228" width="220" height="16" rx="4" fill="#11111b" />
+      <rect x="155" y="228" width="204" height="16" rx="4" fill="#eba0ac" />
+      <text x="367" y="240" fill="#cdd6f4" font-size="11" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">21.40 μs</text>
+    
+      <!-- Row 8: Memory Buf (1MB) -->
+      <text x="147" y="264" fill="#cdd6f4" font-size="11" font-weight="500" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Memory Buf (1MB)</text>
+      <rect x="155" y="252" width="220" height="16" rx="4" fill="#11111b" />
+      <rect x="155" y="252" width="211" height="16" rx="4" fill="#cba6f7" />
+      <text x="374" y="264" fill="#cdd6f4" font-size="11" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">23.10 μs</text>
+    
+
+  <!-- Footer Info -->
+  <line x1="24" y1="284" x2="476" y2="284" stroke="#313244" stroke-width="1" />
+  <text x="24" y="299" fill="#6c7086" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">Kalibera &amp; Jones standard (N=30, sqrt-scaled display)</text>
+  <text x="476" y="299" fill="#6c7086" font-size="10" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">p50 Latency (μs)</text>
+</svg>

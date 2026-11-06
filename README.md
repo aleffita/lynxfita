@@ -1,27 +1,21 @@
-<div align="center">
+<h1 align="center">LynxFita</h1>
 
-# LynxFita
+<p align="center">
+  <strong>Modular Desktop Application Runtime Architecture for LynxJS</strong><br />
+  <em>Cordis Microkernel Spine &bull; Meta Hermes C++20 JSI Engine &bull; Stationary Shared Memory &bull; Ed25519 Provenance</em>
+</p>
 
-**Modular Desktop Application Runtime Architecture for LynxJS**
-
-*Cordis Microkernel Spine &bull; Meta Hermes C++20 JSI Engine &bull; Stationary Shared Memory &bull; Ed25519 Provenance*
-
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![CI Status](https://github.com/aleffita/lynxfita/actions/workflows/ci.yml/badge.svg)](https://github.com/aleffita/lynxfita/actions)
-[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B)](https://en.cppreference.com/w/cpp/20)
-[![pnpm workspace](https://img.shields.io/badge/pnpm-workspace-orange?logo=pnpm)](https://pnpm.io/)
-[![Cordis](https://img.shields.io/badge/Cordis-arXiv%3A2608.25512-00A88F)](https://arxiv.org/abs/2608.25512)
-[![Sponsor](https://img.shields.io/badge/Sponsor-FitaLabs-635BFF?logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)
-[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/aleffita)
+<p align="center">
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License: Apache 2.0" /></a>
+  <a href="https://github.com/aleffita/lynxfita/actions"><img src="https://github.com/aleffita/lynxfita/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+  <a href="https://en.cppreference.com/w/cpp/20"><img src="https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B" alt="C++20" /></a>
+  <a href="https://pnpm.io/"><img src="https://img.shields.io/badge/pnpm-workspace-orange?logo=pnpm" alt="pnpm workspace" /></a>
+  <a href="https://arxiv.org/abs/2608.25512"><img src="https://img.shields.io/badge/Cordis-arXiv%3A2608.25512-00A88F" alt="Cordis" /></a>
+  <a href="https://donate.stripe.com/9B66oHaordEdf36erNfEk00"><img src="https://img.shields.io/badge/Sponsor-FitaLabs-635BFF?logo=stripe&logoColor=white" alt="Sponsor" /></a>
+  <a href="https://github.com/sponsors/aleffita"><img src="https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?logo=githubsponsors" alt="GitHub Sponsors" /></a>
+</p>
 
 <br />
-
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/cordis-spine-light.png" />
-  <img src="docs/assets/cordis-spine-dark.png" alt="LynxFita Endogenous Cordis Runtime Spine" width="100%" />
-</picture>
-
-</div>
 
 ---
 
@@ -37,32 +31,53 @@ In modern desktop application engineering, developers face structural trade-offs
 
 ```mermaid
 flowchart TD
-    subgraph Host["Desktop Native Host (C++20 Engine)"]
-        NativeEngine["lynxfita_explorer (.exe / ELF)"]
-        MetaHermes["Meta Hermes JSI Runtime (hermesvm_a)"]
-        DmaArena["Stationary Shared Memory Arena (64B-Aligned DMA)"]
-        FfiLoader["Dynamic Native FFI Loader (LoadLibraryExW / dlopen)"]
-    end
+    classDef core fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px,color:#cdd6f4
+    classDef memory fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+    classDef ffi fill:#1e1e2e,stroke:#fab387,stroke-width:2px,color:#cdd6f4
+    classDef security fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4
+    classDef bundle fill:#181825,stroke:#45475a,stroke-width:1.5px,color:#a6adc8
+    classDef surface fill:#1e1e2e,stroke:#f9e2af,stroke-width:2px,color:#cdd6f4
 
     subgraph Bundle["Self-Contained Relocatable Application Bundle"]
-        Launchers["Portable Launchers (run.cmd / AppRun)"]
-        AppJson["Application Descriptor (lynxfita.app.json)"]
+        Launchers["Portable Launchers (run.cmd / AppRun)"]:::bundle
+        AppJson["Application Descriptor (lynxfita.app.json)"]:::bundle
         subgraph Payload["Embedded Distribution Payload"]
-            Bytecode["bundles/ (Authentic Hermes HBC Bytecode & Manifest)"]
-            Plugins["plugins/ (Dynamic Shared Libraries .dll / .so)"]
-            Assets["assets/ (Static Media, Fonts & Themes)"]
+            Bytecode["bundles/ (Hermes HBC Bytecode)"]:::bundle
+            Plugins["plugins/ (Native Shared Libraries .dll / .so)"]:::bundle
+            Assets["assets/ (Static Media, Fonts & Themes)"]:::bundle
         end
-        Manifest["release.manifest.json (SHA-256 Digest of All Files)"]
-        Signature["release.sig (Ed25519 Cryptographic Signature)"]
+        Manifest["release.manifest.json (SHA-256 Hashes)"]:::security
+        Signature["release.sig (Ed25519 Signature)"]:::security
     end
 
-    Launchers -->|Executes Host with --gui| NativeEngine
-    NativeEngine --> MetaHermes
-    NativeEngine --> DmaArena
-    NativeEngine --> FfiLoader
-    MetaHermes --> Bytecode
-    FfiLoader --> Plugins
-    Signature -.->|Authenticates Integrity| Manifest
+    subgraph Host["Desktop Native Host (C++20 Engine)"]
+        NativeEngine["lynxfita_explorer (.exe / ELF)"]:::core
+        Verifier["Integrity Gate (Ed25519 & SHA-256)"]:::security
+        MetaHermes["Meta Hermes JSI Runtime (hermesvm_a)"]:::core
+        DmaArena["Stationary Shared Memory (64B Arena 0x2000)"]:::memory
+        FfiLoader["Dynamic Native FFI (LoadLibraryExW / dlopen)"]:::ffi
+    end
+
+    subgraph Windowing["Native Desktop Surface"]
+        LynxSurface["Declarative Lynx AST & Surface Window"]:::surface
+    end
+
+    Launchers -->|Spawns Host Process| NativeEngine
+    NativeEngine -->|1. Verifies Signature| Verifier
+    Signature -->|Signature Bytes| Verifier
+    Manifest -->|Payload Hashes| Verifier
+    Verifier -->|2. Validates Integrity| AppJson
+    AppJson -->|3. Configures Context| NativeEngine
+    NativeEngine -->|4. Allocates Stationary Memory| DmaArena
+    NativeEngine -->|5. Initializes Engine| MetaHermes
+    NativeEngine -->|6. Mounts Dynamic Loader| FfiLoader
+    Bytecode -->|Maps HBC Payload| MetaHermes
+    Plugins -->|Loads Shared Libraries| FfiLoader
+    Assets -->|Supplies UI Resources| LynxSurface
+    FfiLoader <-->|SIMD Operations| DmaArena
+    MetaHermes <-->|JSI HostObject Bridge| DmaArena
+    MetaHermes -->|7. Evaluates UI Tree| LynxSurface
+    LynxSurface -->|8. Renders Native View| NativeEngine
 ```
 
 ### Runtime Execution Lifecycle
@@ -75,22 +90,25 @@ sequenceDiagram
     actor User as Developer / User
     participant Launcher as Launcher (run.cmd / AppRun)
     participant Host as Native Host (lynxfita_explorer)
+    participant Verifier as Ed25519 Verifier
     participant Hermes as Meta Hermes VM (hermesvm_a)
     participant DMA as Stationary DMA Arena
     participant FFI as Native FFI Plugin (.dll / .so)
-    participant Lynx as Declarative Lynx AST View
+    participant Lynx as Declarative Lynx Surface
 
     User->>Launcher: Launch Application
-    Launcher->>Host: Invoke lynxfita_explorer --gui bundles/app.hbc
-    Host->>Host: Verify Ed25519 Signature & SHA-256 Manifest
-    Host->>Hermes: Initialize Hermes Runtime Adapter
+    Launcher->>Host: Execute lynxfita_explorer --gui bundles/app.hbc
+    Host->>Verifier: Validate release.sig & release.manifest.json
+    Verifier-->>Host: Integrity Authenticated
     Host->>DMA: Allocate 64B-Aligned Stationary Arena (1 MB)
-    Host->>Hermes: Attach DmaEibEngine as JSI HostObject (__lynxfita_stationary_dma)
+    Host->>Hermes: Initialize Hermes Runtime Adapter & Attach DMA HostObject
     Host->>Hermes: Evaluate Bytecode (app.hbc, v100)
     Hermes->>FFI: Load Dynamic Plugin (NativeFfiLoader)
     FFI->>DMA: Compute SIMD Telemetry at Offset 0x2000
-    Hermes->>Lynx: Render Declarative Lynx View (<view>, <text>, <image>)
+    DMA-->>Hermes: Read Real-Time Telemetry Slots
+    Hermes->>Lynx: Emit Declarative AST (<view>, <text>, <image>)
     Lynx-->>Host: Mount Native Desktop Surface Window
+    Host-->>User: Display Active Interactive Window
 ```
 
 ### Cordis Capability Seams
@@ -121,26 +139,33 @@ Applications and plugins run in isolated Cordis Fibers (`ctx.isolate()`), acquir
 
 ```mermaid
 flowchart LR
+    classDef ui fill:#1e1e2e,stroke:#f9e2af,stroke-width:2px,color:#cdd6f4
+    classDef control fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px,color:#cdd6f4
+    classDef hardware fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+    classDef native fill:#1e1e2e,stroke:#fab387,stroke-width:2px,color:#cdd6f4
+
     subgraph UI["Declarative Lynx Surface"]
-        View["Lynx View Components (<view>, <text>)"]
-        Intent["User Action / Trigger"]
+        View["Lynx View Components (<view>, <text>)"]:::ui
+        Intent["User Action / Trigger (Refresh, Select)"]:::ui
     end
 
     subgraph Control["Cordis Control Plane"]
-        Store["WeatherStore (MVI Unidirectional Reducer)"]
-        State["Immutable WeatherState"]
+        Store["WeatherStore (MVI Unidirectional Reducer)"]:::control
+        State["Immutable WeatherState (Telemetry, Cities)"]:::control
     end
 
-    subgraph Hardware["Stationary Shared Memory"]
-        DMA["Stationary DMA Lane (Offset 0x2000)"]
-        Plugin["Native SIMD Plugin (.dll / .so)"]
+    subgraph Hardware["Stationary Shared Memory & FFI"]
+        DMA["Stationary DMA Lane (Offset 0x2000)"]:::hardware
+        Plugin["Native SIMD Plugin (.dll / .so)"]:::native
     end
 
-    Intent -->|dispatch()| Store
-    Store -->|Reducer| State
-    State -->|Renders| View
-    Store -->|Zero-Copy Sync| DMA
-    DMA <-->|SIMD Compute| Plugin
+    View -->|User Interaction| Intent
+    Intent -->|dispatch(intent)| Store
+    Store -->|Pure Reducer Function| State
+    State -->|Renders Declarative AST| View
+    Store -->|Zero-Copy DMA Synchronization| DMA
+    DMA <-->|Vectorized In-Place Computation| Plugin
+    Plugin -->|Telemetry Result Slot| Store
 ```
 
 | Project / Showcase | Path | Description & Runtime Environment |
@@ -164,19 +189,32 @@ LynxFita incorporates digital signatures for **binary release integrity** and **
 
 ```mermaid
 flowchart TD
-    Packager["SelfContainedPackager (@lynxfita/builder)"] -->|Hashes Payload Files| Manifest["release.manifest.json"]
-    Packager -->|Signs with Ed25519 Private Key| Sig["release.sig"]
-    
-    subgraph HostVerification["Client / Runtime Host (@lynxfita/updater)"]
-        Verify{"Verify Ed25519 Signature & SHA-256 Hashes"}
-        Baseline["Deterministic Rollback (Embedded Baseline 1.0.0)"]
-        Stage["Stage & Mount Bundle in Isolated Fiber"]
+    classDef builder fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px,color:#cdd6f4
+    classDef manifest fill:#181825,stroke:#45475a,stroke-width:1.5px,color:#a6adc8
+    classDef crypto fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4
+    classDef decision fill:#1e1e2e,stroke:#f9e2af,stroke-width:2px,color:#cdd6f4
+    classDef success fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+    classDef rollback fill:#1e1e2e,stroke:#eba0ac,stroke-width:2px,color:#cdd6f4
+
+    subgraph Packaging["Build & Packaging Pipeline (@lynxfita/builder)"]
+        Packager["SelfContainedPackager"]:::builder
+        Manifest["release.manifest.json (SHA-256 Hashes)"]:::manifest
+        Sig["release.sig (Ed25519 Signature)"]:::crypto
     end
 
-    Manifest --> Verify
-    Sig --> Verify
-    Verify -->|Signature Valid & SHA-256 Match| Stage
-    Verify -->|Tampered Payload / Invalid Signature| Baseline
+    subgraph Runtime["Client / Runtime Host (@lynxfita/updater)"]
+        Verify{"Verify Ed25519 Signature & Hashes"}:::decision
+        Stage["Stage & Mount in Isolated Fiber"]:::success
+        Baseline["Deterministic Rollback (Embedded Baseline)"]:::rollback
+    end
+
+    Packager -->|1. Computes SHA-256 Digests| Manifest
+    Packager -->|2. Signs with Private Key| Sig
+    Manifest -->|Payload Hashes| Verify
+    Sig -->|Signature Data| Verify
+    Verify -->|3a. Signature Valid & Digests Match| Stage
+    Verify -->|3b. Invalid Signature or Digest Mismatch| Baseline
+    Stage -->|Disposer on Unload| Baseline
 ```
 
 1. **Signed Release Manifests (`@lynxfita/builder`)**: The packaging pipeline generates `release.manifest.json` containing SHA-256 digests for all bundle payloads, native binaries, and dynamic libraries, signed with an Ed25519 private key (`release.sig`).
@@ -189,44 +227,23 @@ flowchart TD
 
 Statistical microbenchmarks are executed via `pnpm bench` ([`benchmarks/run_benchmarks.ts`](benchmarks/run_benchmarks.ts)) using the Kalibera & Jones standard ($N = 30$ independent sample batches after 10 discarded warm-up rounds).
 
-Full methodology and raw statistical report: [`BENCHMARK.md`](BENCHMARK.md).
+Full methodology and raw statistical distributions ($p50$, $p95$, $p99$, $IQR$, $CV\%$, 95% CI): [`BENCHMARK.md`](BENCHMARK.md).
 
-> **Measurement Context Note**: The charts and table below reflect memory operations executed on Node.js v26.12.1 (`AMD Ryzen 5 4500 6-Core Processor`, `Windows NT 10.0.19045 x64`). High throughput metrics represent in-memory V8 TypedArray buffer operations, not hardware peripheral DMA transfers.
+> **Measurement Context Note**: The charts and metrics below reflect memory operations executed on Node.js v26.12.1 (`AMD Ryzen 5 4500 6-Core Processor`, `Windows NT 10.0.19045 x64`). High throughput metrics represent in-memory V8 TypedArray buffer operations, not hardware peripheral DMA transfers.
 
-### Throughput Scaling
+<p align="center">
+  <img src="docs/assets/benchmark-throughput.svg" alt="Memory Transfer Throughput Scaling" width="49%" />
+  <img src="docs/assets/benchmark-latency.svg" alt="Subsystem Execution Latency" width="49%" />
+</p>
 
-```mermaid
-xychart-beta
-    title "In-Memory Buffer Transfer Throughput Scaling (MB/s)"
-    x-axis ["64 B", "4 KB", "64 KB", "1 MB"]
-    y-axis "Throughput (MB/s)" 0 --> 45000
-    bar [88, 6135, 38981, 42498]
-```
+### High-Signal Metric Overview
 
-### Operation Latency
-
-```mermaid
-xychart-beta
-    title "Median Operation Latency (p50 in microseconds)"
-    x-axis ["Buf 64B", "Buf 4KB", "Buf 64KB", "Buf 1MB", "SIMD 16B", "Proto 64B", "Proto 4KB", "WASI 64B"]
-    y-axis "p50 Latency (μs)" 0 --> 25
-    bar [0.60, 0.60, 1.60, 23.10, 0.36, 7.70, 9.60, 0.50]
-```
-
-### Summary Metrics
-
-| Subsystem / Operation | Payload | Median Latency ($p50$) | Throughput | Implementation Stack |
+| Subsystem & Operation | Payload Range | Median Latency ($p50$) | Peak Bandwidth | Measurement Baseline |
 | :--- | :---: | :---: | :---: | :--- |
-| **In-Memory Buffer Transfer** | `64 B` | `0.60 μs` | `88.46 MB/s` | V8 TypedArray / Stationary buffer slice |
-| **In-Memory Buffer Transfer** | `4 KB` | `0.60 μs` | `6,135.47 MB/s` | V8 TypedArray / Stationary buffer slice |
-| **In-Memory Buffer Transfer** | `64 KB` | `1.60 μs` | `38,981.29 MB/s` | V8 TypedArray / Stationary buffer slice |
-| **In-Memory Buffer Transfer** | `1 MB` | `23.10 μs` | `42,498.94 MB/s` | V8 TypedArray / Stationary buffer slice |
-| **SIMD Float View Pack/Unpack** | `16 B` | `0.36 μs` | `38.22 MB/s` | IEEE 754 float32 DataView vector lane |
-| **Protobuf Wire RPC Encoding** | `64 B` | `7.70 μs` | `6.80 MB/s` | Binary wire varint packing over memory slot |
-| **Protobuf Wire RPC Encoding** | `4 KB` | `9.60 μs` | `319.57 MB/s` | Binary wire varint packing over memory slot |
-| **WASI Linear Memory Interop** | `64 B` | `0.50 μs` | `117.38 MB/s` | Sandboxed WASI memory bounds checking |
-| **WASI Linear Memory Interop** | `64 KB` | `21.40 μs` | `2,851.28 MB/s` | Sandboxed WASI memory bounds checking |
-| **WASI Linear Memory Interop** | `1 MB` | `285.20 μs` | `3,268.29 MB/s` | Sandboxed WASI memory bounds checking |
+| **Stationary Memory Transfer** | `64 B` &ndash; `1 MB` | `0.60` &ndash; `23.10 μs` | `42,498.94 MB/s` | V8 TypedArray / in-memory stationary arena |
+| **SIMD Float32 Vector Lane** | `16 B` | `0.36 μs` | `38.22 MB/s` | IEEE 754 float32 DataView vector lane |
+| **Protobuf Wire RPC Encoding** | `64 B` &ndash; `4 KB` | `7.70` &ndash; `9.60 μs` | `319.57 MB/s` | Binary wire varint packing over memory slot |
+| **WASI Linear Memory Interop** | `64 B` &ndash; `1 MB` | `0.50` &ndash; `285.20 μs` | `3,268.29 MB/s` | Sandboxed WASI memory bounds checking |
 
 ---
 
