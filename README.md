@@ -4,7 +4,7 @@
 
 **Modular Desktop Application Runtime Architecture for LynxJS**
 
-*Cordis Microkernel Spine &bull; C++20 JSI Host Objects & Dynamic FFI &bull; Shared Memory Data Planes &bull; Ed25519 Release Provenance*
+*Cordis Microkernel Spine &bull; Meta Hermes C++20 JSI Engine &bull; Stationary Shared Memory &bull; Ed25519 Provenance*
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://github.com/aleffita/lynxfita/actions/workflows/ci.yml/badge.svg)](https://github.com/aleffita/lynxfita/actions)
@@ -31,21 +31,66 @@
 
 ### The Architectural Problem Space
 
-In modern desktop application development, developers face structural trade-offs between web runtimes and native embedding:
-- **Lynxtron (`vendor/lynxtron`)**: Pairs Node.js with Lynx (`LynxWindow`), utilizing Node-API and Chromium-derived platform window plumbing.
-- **LynxFita Approach**: Explores an endogenous Cordis capability seam model. Every subsystem—memory buffers, binary wire serialization, bytecode execution, dynamic native libraries, and release integrity—is mounted as a revertible Cordis service on a unified context (`LynxFitaContext` in TypeScript and `lynxfita::cordis::NativeContext` in C++20).
+In modern desktop application engineering, developers face structural trade-offs between monolithic web runtimes and native embedding:
+- **Lynxtron (`vendor/lynxtron`)**: Pairs Node.js with Lynx (`LynxWindow`), utilizing Node-API and platform window plumbing.
+- **LynxFita Approach**: Explores an endogenous Cordis capability seam model. Every subsystem—memory buffers, binary wire serialization, Meta Hermes bytecode execution, dynamic native libraries, and release integrity—is mounted as a revertible Cordis service on a unified context (`LynxFitaContext` in TypeScript and `lynxfita::cordis::NativeContext` in C++20).
 
+```mermaid
+flowchart TD
+    subgraph Host["Desktop Native Host (C++20 Engine)"]
+        NativeEngine["lynxfita_explorer (.exe / ELF)"]
+        MetaHermes["Meta Hermes JSI Runtime (hermesvm_a)"]
+        DmaArena["Stationary Shared Memory Arena (64B-Aligned DMA)"]
+        FfiLoader["Dynamic Native FFI Loader (LoadLibraryExW / dlopen)"]
+    end
+
+    subgraph Bundle["Self-Contained Relocatable Application Bundle"]
+        Launchers["Portable Launchers (run.cmd / AppRun)"]
+        AppJson["Application Descriptor (lynxfita.app.json)"]
+        subgraph Payload["Embedded Distribution Payload"]
+            Bytecode["bundles/ (Authentic Hermes HBC Bytecode & Manifest)"]
+            Plugins["plugins/ (Dynamic Shared Libraries .dll / .so)"]
+            Assets["assets/ (Static Media, Fonts & Themes)"]
+        end
+        Manifest["release.manifest.json (SHA-256 Digest of All Files)"]
+        Signature["release.sig (Ed25519 Cryptographic Signature)"]
+    end
+
+    Launchers -->|Executes Host with --gui| NativeEngine
+    NativeEngine --> MetaHermes
+    NativeEngine --> DmaArena
+    NativeEngine --> FfiLoader
+    MetaHermes --> Bytecode
+    FfiLoader --> Plugins
+    Signature -.->|Authenticates Integrity| Manifest
 ```
-+-----------------------------------------------------------------------------------+
-| LynxFita Application Distribution Layout                                          |
-|                                                                                   |
-|  1. C++20 Native Engine Host (JSI Engine + Dynamic FFI Loader)                    |
-|  2. Release Manifest & Digital Provenance (.upd_info + Ed25519 signature)         |
-|  3. Embedded Application Payload:                                                 |
-|     ├── bundles/ (Application control plane & UI component bundles)               |
-|     ├── plugins/ (Dynamic shared libraries .dll/.so/.dylib & Cordis plugins)      |
-|     └── assets/  (Static assets, fonts, and application metadata)                 |
-+-----------------------------------------------------------------------------------+
+
+### Runtime Execution Lifecycle
+
+The desktop host evaluates compiled Meta Hermes bytecode and orchestrates native subsystems through zero-copy memory lanes:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Developer / User
+    participant Launcher as Launcher (run.cmd / AppRun)
+    participant Host as Native Host (lynxfita_explorer)
+    participant Hermes as Meta Hermes VM (hermesvm_a)
+    participant DMA as Stationary DMA Arena
+    participant FFI as Native FFI Plugin (.dll / .so)
+    participant Lynx as Declarative Lynx AST View
+
+    User->>Launcher: Launch Application
+    Launcher->>Host: Invoke lynxfita_explorer --gui bundles/app.hbc
+    Host->>Host: Verify Ed25519 Signature & SHA-256 Manifest
+    Host->>Hermes: Initialize Hermes Runtime Adapter
+    Host->>DMA: Allocate 64B-Aligned Stationary Arena (1 MB)
+    Host->>Hermes: Attach DmaEibEngine as JSI HostObject (__lynxfita_stationary_dma)
+    Host->>Hermes: Evaluate Bytecode (app.hbc, v100)
+    Hermes->>FFI: Load Dynamic Plugin (NativeFfiLoader)
+    FFI->>DMA: Compute SIMD Telemetry at Offset 0x2000
+    Hermes->>Lynx: Render Declarative Lynx View (<view>, <text>, <image>)
+    Lynx-->>Host: Mount Native Desktop Surface Window
 ```
 
 ### Cordis Capability Seams
@@ -57,7 +102,7 @@ Subsystems are implemented as Cordis **Services** with declared dependencies (`i
 | **`ctx.dma`** | `DmaService` (`@lynxfita/core`) | `DmaEibEngine` (`dma_eib_engine.cc`) | 64-byte aligned stationary memory arena (`0x0000` telemetry, `0x1000` wire buffer, `0x2000` SIMD slot) with parallel worker lanes. |
 | **`ctx.protobuf`** | `ProtobufService` (`@lynxfita/core`) | `ProtobufBridge` (`protobuf_bridge.cc`) | Varint and binary wire framing (`tag << 3 \| wire_type`) over shared memory slots. |
 | **`ctx.ffi`** | `FfiService` (`@lynxfita/core`) | `NativeFfiLoader` (`native_ffi_loader.cc`) | Dynamic shared library loader (`LoadLibraryExW` on Win32, `dlopen` on POSIX) with automatic cleanup on Fiber unload. |
-| **`ctx.compiler`** | `CompilerService` (`@lynxfita/core`) | `HermesCompiler` (`hermes_compiler.cc`) | Control-plane compiler interface. *[Roadmap: Direct CMake integration with `vendor/hermes` tools/hermesc]*. |
+| **`ctx.compiler`** | `CompilerService` (`@lynxfita/core`) | `HermesRuntimeAdapter` & `compileJS` (`hermes_compiler.cc`) | Authentic Meta Hermes C++20 JSI adapter (`hermesapi`, `hermesvm_a`) and ahead-of-time bytecode compilation via `hermesc` (`compileWithHermesc`). |
 | **`ctx.wasi`** | `WasiComponentService` (`@lynxfita/wasi-runtime`) | `WasiHostModule` (`wasi_host_module.cc`) | Linear memory interop and WIT interface parser (`@lynxfita/codegen`). *[Roadmap: Bytecode Alliance Wasmtime integration]*. |
 | **`ctx.gpu`** | `GpuService` (`@lynxfita/core`) | — | WebGPU pipeline abstraction. *[Roadmap: Native Dawn/wgpu C++ backend dispatch]*. |
 | **`ctx.federation`** | `FederationService` (`@lynxfita/updater`) | — | Validates release manifests and updates using Ed25519 digital signatures and SHA-256 digests. |
@@ -72,13 +117,39 @@ Applications and plugins run in isolated Cordis Fibers (`ctx.isolate()`), acquir
   <img src="docs/assets/lynxfita-explorer-demo.gif" alt="LynxFita Desktop Explorer Session" width="100%" />
 </div>
 
+### MVI Unidirectional Architecture & Telemetry Lane
+
+```mermaid
+flowchart LR
+    subgraph UI["Declarative Lynx Surface"]
+        View["Lynx View Components (<view>, <text>)"]
+        Intent["User Action / Trigger"]
+    end
+
+    subgraph Control["Cordis Control Plane"]
+        Store["WeatherStore (MVI Unidirectional Reducer)"]
+        State["Immutable WeatherState"]
+    end
+
+    subgraph Hardware["Stationary Shared Memory"]
+        DMA["Stationary DMA Lane (Offset 0x2000)"]
+        Plugin["Native SIMD Plugin (.dll / .so)"]
+    end
+
+    Intent -->|dispatch()| Store
+    Store -->|Reducer| State
+    State -->|Renders| View
+    Store -->|Zero-Copy Sync| DMA
+    DMA <-->|SIMD Compute| Plugin
+```
+
 | Project / Showcase | Path | Description & Runtime Environment |
 | :--- | :--- | :--- |
 | **Desktop Shell Preview** | [`examples/explorer`](examples/explorer) | TypeScript interactive developer shell demonstrating Cordis service lifecycle, route navigation (`lynxfita://home`, `lynxfita://settings`), and memory slot inspection. Serves local preview at `http://127.0.0.1:4173` via `pnpm explore`. |
-| **Weather Showcase MVI** | [`examples/weather-showcase`](examples/weather-showcase) | Unidirectional Model-View-Intent weather radar application (`forecast-home`, `hourly-detail`, `city-search`), dark/light themes (`#f9d65d`), 14 weather conditions, and SIMD telemetry integration. |
+| **Weather Showcase MVI** | [`examples/weather-showcase`](examples/weather-showcase) | Unidirectional Model-View-Intent weather radar application with declarative Lynx components (`<view>`, `<text>`, `<image>`), dark/light themes (`#f9d65d`), 14 weather conditions, and SIMD telemetry integration. |
 | **WIT & Native SIMD Studio** | [`examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts`](examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts) | Interactive WebAssembly Interface Type (WIT) parser (`parseWitSpec`) and SIMD execution interface over memory slot `0x2000`. |
 | **Stationary DMA Lab** | [`examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts`](examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts) | Memory slot visualizer (`0x0000`–`0x3FFF`) and canvas visualization. |
-| **`lynxfita_explorer` Native Host** | [`src/native/src/explorer_main.cc`](src/native/src/explorer_main.cc) | Win32 native test runner and demonstration binary for C++20 engine validation. *[Roadmap: LynxView hardware rendering surface integration via `vendor/lynxtron`]*. |
+| **`lynxfita_explorer` Native Host** | [`src/native/src/explorer_main.cc`](src/native/src/explorer_main.cc) | Desktop application host binary executing compiled Hermes bytecode bundles via `--run <file.hbc>` and interactive desktop window via `--gui [bundle.hbc]`. |
 
 <p align="center">
   <img src="docs/assets/weather-showcase-dark.png" alt="Weather Showcase Dark Mode" width="49%" />
@@ -91,7 +162,24 @@ Applications and plugins run in isolated Cordis Fibers (`ctx.isolate()`), acquir
 
 LynxFita incorporates digital signatures for **binary release integrity** and **over-the-air update verification**:
 
-1. **Signed Release Manifests (`@lynxfita/builder`)**: The packaging pipeline generates `release.manifest.json` containing SHA-256 digests for all bundle payloads and dynamic libraries, signed with an Ed25519 private key (`release.sig`).
+```mermaid
+flowchart TD
+    Packager["SelfContainedPackager (@lynxfita/builder)"] -->|Hashes Payload Files| Manifest["release.manifest.json"]
+    Packager -->|Signs with Ed25519 Private Key| Sig["release.sig"]
+    
+    subgraph HostVerification["Client / Runtime Host (@lynxfita/updater)"]
+        Verify{"Verify Ed25519 Signature & SHA-256 Hashes"}
+        Baseline["Deterministic Rollback (Embedded Baseline 1.0.0)"]
+        Stage["Stage & Mount Bundle in Isolated Fiber"]
+    end
+
+    Manifest --> Verify
+    Sig --> Verify
+    Verify -->|Signature Valid & SHA-256 Match| Stage
+    Verify -->|Tampered Payload / Invalid Signature| Baseline
+```
+
+1. **Signed Release Manifests (`@lynxfita/builder`)**: The packaging pipeline generates `release.manifest.json` containing SHA-256 digests for all bundle payloads, native binaries, and dynamic libraries, signed with an Ed25519 private key (`release.sig`).
 2. **Cryptographic Verification (`@lynxfita/updater`)**: The updater service verifies the digital signature against the embedded public key and validates payload SHA-256 hashes prior to staging updates.
 3. **Deterministic Rollback (`ctx.federation`)**: If a remote bundle fails verification or encounters an unhandled fault, the reconciler unloads the affected Fiber and restores the embedded baseline bundle.
 
@@ -101,22 +189,44 @@ LynxFita incorporates digital signatures for **binary release integrity** and **
 
 Statistical microbenchmarks are executed via `pnpm bench` ([`benchmarks/run_benchmarks.ts`](benchmarks/run_benchmarks.ts)) using the Kalibera & Jones standard ($N = 30$ independent sample batches after 10 discarded warm-up rounds).
 
-Full methodology and report: [`BENCHMARK.md`](BENCHMARK.md).
+Full methodology and raw statistical report: [`BENCHMARK.md`](BENCHMARK.md).
 
-> **Measurement Context Note**: The table below reflects memory operations executed on Node.js v26.12.1 (`AMD Ryzen 5 4500 6-Core Processor`, `Windows NT 10.0.19045 x64`). High throughput metrics represent in-memory V8 TypedArray buffer operations, not hardware peripheral DMA transfers.
+> **Measurement Context Note**: The charts and table below reflect memory operations executed on Node.js v26.12.1 (`AMD Ryzen 5 4500 6-Core Processor`, `Windows NT 10.0.19045 x64`). High throughput metrics represent in-memory V8 TypedArray buffer operations, not hardware peripheral DMA transfers.
 
-| Subsystem / Operation | Payload | $p50$ ($\mu\text{s}$) | IQR ($\mu\text{s}$) | $p95$ ($\mu\text{s}$) | $p99$ ($\mu\text{s}$) | Mean $\pm$ 95% CI ($\mu\text{s}$) | Throughput (MB/s) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **In-Memory Buffer Transfer** | `64 B` | `0.60` | `0.00` | `1.20` | `2.20` | `0.70 ± 0.10` | `88.46` |
-| **In-Memory Buffer Transfer** | `4 KB` | `0.60` | `0.00` | `1.00` | `1.10` | `0.60 ± 0.00` | `6,135.47` |
-| **In-Memory Buffer Transfer** | `64 KB` | `1.60` | `0.00` | `1.80` | `2.00` | `1.60 ± 0.00` | `38,981.29` |
-| **In-Memory Buffer Transfer** | `1 MB` | `23.10` | `0.20` | `27.40` | `30.70` | `23.50 ± 0.60` | `42,498.94` |
-| **SIMD Float View Pack/Unpack** | `16 B` | `0.36` | `0.07` | `0.79` | `0.82` | `0.40 ± 0.10` | `38.22` |
-| **Protobuf Method Wire Encoding**| `64 B` | `7.70` | `2.90` | `16.60` | `17.20` | `9.00 ± 0.90` | `6.80` |
-| **Protobuf Method Wire Encoding**| `4 KB` | `9.60` | `5.00` | `23.70` | `35.30` | `12.20 ± 2.10` | `319.57` |
-| **Linear Memory Read/Write** | `64 B` | `0.50` | `0.10` | `1.10` | `1.30` | `0.50 ± 0.10` | `117.38` |
-| **Linear Memory Read/Write** | `64 KB` | `21.40` | `3.60` | `31.60` | `32.60` | `21.90 ± 1.40` | `2,851.28` |
-| **Linear Memory Read/Write** | `1 MB` | `285.20` | `85.90` | `472.80` | `631.50` | `306.00 ± 33.60` | `3,268.29` |
+### Throughput Scaling
+
+```mermaid
+xychart-beta
+    title "In-Memory Buffer Transfer Throughput Scaling (MB/s)"
+    x-axis ["64 B", "4 KB", "64 KB", "1 MB"]
+    y-axis "Throughput (MB/s)" 0 --> 45000
+    bar [88, 6135, 38981, 42498]
+```
+
+### Operation Latency
+
+```mermaid
+xychart-beta
+    title "Median Operation Latency (p50 in microseconds)"
+    x-axis ["Buf 64B", "Buf 4KB", "Buf 64KB", "Buf 1MB", "SIMD 16B", "Proto 64B", "Proto 4KB", "WASI 64B"]
+    y-axis "p50 Latency (μs)" 0 --> 25
+    bar [0.60, 0.60, 1.60, 23.10, 0.36, 7.70, 9.60, 0.50]
+```
+
+### Summary Metrics
+
+| Subsystem / Operation | Payload | Median Latency ($p50$) | Throughput | Implementation Stack |
+| :--- | :---: | :---: | :---: | :--- |
+| **In-Memory Buffer Transfer** | `64 B` | `0.60 μs` | `88.46 MB/s` | V8 TypedArray / Stationary buffer slice |
+| **In-Memory Buffer Transfer** | `4 KB` | `0.60 μs` | `6,135.47 MB/s` | V8 TypedArray / Stationary buffer slice |
+| **In-Memory Buffer Transfer** | `64 KB` | `1.60 μs` | `38,981.29 MB/s` | V8 TypedArray / Stationary buffer slice |
+| **In-Memory Buffer Transfer** | `1 MB` | `23.10 μs` | `42,498.94 MB/s` | V8 TypedArray / Stationary buffer slice |
+| **SIMD Float View Pack/Unpack** | `16 B` | `0.36 μs` | `38.22 MB/s` | IEEE 754 float32 DataView vector lane |
+| **Protobuf Wire RPC Encoding** | `64 B` | `7.70 μs` | `6.80 MB/s` | Binary wire varint packing over memory slot |
+| **Protobuf Wire RPC Encoding** | `4 KB` | `9.60 μs` | `319.57 MB/s` | Binary wire varint packing over memory slot |
+| **WASI Linear Memory Interop** | `64 B` | `0.50 μs` | `117.38 MB/s` | Sandboxed WASI memory bounds checking |
+| **WASI Linear Memory Interop** | `64 KB` | `21.40 μs` | `2,851.28 MB/s` | Sandboxed WASI memory bounds checking |
+| **WASI Linear Memory Interop** | `1 MB` | `285.20 μs` | `3,268.29 MB/s` | Sandboxed WASI memory bounds checking |
 
 ---
 
@@ -147,6 +257,9 @@ pnpm explore
 
 # 6. Run statistical benchmarks
 pnpm bench
+
+# 7. Package self-contained desktop application (AppImage/PE layout with Ed25519 signature)
+node --experimental-strip-types scripts/package-release.ts
 ```
 
 ---
