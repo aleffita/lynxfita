@@ -17,7 +17,33 @@ author: aleffita
 
 LynxFita uses [Cordis](https://github.com/shigma/cordis) ([`vendor/cordis`](../vendor/cordis), [arXiv:2608.25512](https://arxiv.org/abs/2608.25512)) as its endogenous runtime spine across both the TypeScript control plane (`LynxFitaContext`) and the C++20 native engine (`lynxfita::cordis::NativeContext`). Every runtime capability is mounted as a Cordis **Service** with explicit `inject` coeffects and revertible `ctx.effect()` disposers.
 
-![Endogenous Cordis Runtime Spine](assets/cordis-spine-dark.png)
+```mermaid
+flowchart TD
+    classDef core fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px,color:#cdd6f4
+    classDef memory fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+    classDef ffi fill:#1e1e2e,stroke:#fab387,stroke-width:2px,color:#cdd6f4
+    classDef security fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4
+    classDef wire fill:#1e1e2e,stroke:#f9e2af,stroke-width:2px,color:#cdd6f4
+
+    subgraph Context["Unified Cordis Context (LynxFitaContext / NativeContext)"]
+        Spine["Cordis Root Context (Fiber Tree)"]:::core
+        DmaService["ctx.dma (Stationary DMA Arena 0x2000)"]:::memory
+        CompilerService["ctx.compiler (Hermes Bytecode AOT / JSI)"]:::core
+        FfiService["ctx.ffi & ctx.wasi (Dynamic Plugins / WASI)"]:::ffi
+        ProtobufService["ctx.protobuf (Zero-JSON Wire Framing)"]:::wire
+        UpdaterService["ctx.updater (Ed25519 Provenance & OTA)"]:::security
+    end
+
+    Spine --> DmaService
+    Spine --> CompilerService
+    Spine --> FfiService
+    Spine --> ProtobufService
+    Spine --> UpdaterService
+    CompilerService <-->|JSI HostObject Bridge| DmaService
+    FfiService <-->|Vectorized Compute| DmaService
+    ProtobufService <-->|Wire Framing Slots| DmaService
+    UpdaterService -->|Disposer on Signature Mismatch| Spine
+```
 
 Interactive viewer: [`docs/architecture/cordis-spine.html`](architecture/cordis-spine.html)
 
