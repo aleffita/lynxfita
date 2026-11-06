@@ -139,6 +139,7 @@ int RunGuiMode(bool auto_close_timer = false, const std::string& bundlePath = ""
   std::string activeBundle = bundlePath;
   if (activeBundle.empty()) {
     std::vector<std::string> searchPaths = {
+      "bundles/weather-showcase.hbc",
       "bundles/explorer.hbc",
       "bundles/app.hbc",
       "dist/bundles/explorer.hbc"
