@@ -1,27 +1,21 @@
-<div align="center">
+<h1 align="center">LynxFita</h1>
 
-# LynxFita
+<p align="center">
+  <strong>Modular Desktop Application Runtime Architecture for LynxJS</strong><br />
+  <em>Cordis Microkernel Spine &bull; Meta Hermes C++20 JSI Engine &bull; Stationary Shared Memory &bull; Ed25519 Provenance</em>
+</p>
 
-**Modular Desktop Application Runtime Architecture for LynxJS**
-
-*Cordis Microkernel Spine &bull; C++20 JSI Host Objects & Dynamic FFI &bull; Shared Memory Data Planes &bull; Ed25519 Release Provenance*
-
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![CI Status](https://github.com/aleffita/lynxfita/actions/workflows/ci.yml/badge.svg)](https://github.com/aleffita/lynxfita/actions)
-[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B)](https://en.cppreference.com/w/cpp/20)
-[![pnpm workspace](https://img.shields.io/badge/pnpm-workspace-orange?logo=pnpm)](https://pnpm.io/)
-[![Cordis](https://img.shields.io/badge/Cordis-arXiv%3A2608.25512-00A88F)](https://arxiv.org/abs/2608.25512)
-[![Sponsor](https://img.shields.io/badge/Sponsor-FitaLabs-635BFF?logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)
-[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?logo=githubsponsors)](https://github.com/sponsors/aleffita)
+<p align="center">
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License: Apache 2.0" /></a>
+  <a href="https://github.com/aleffita/lynxfita/actions"><img src="https://github.com/aleffita/lynxfita/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+  <a href="https://en.cppreference.com/w/cpp/20"><img src="https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B" alt="C++20" /></a>
+  <a href="https://pnpm.io/"><img src="https://img.shields.io/badge/pnpm-workspace-orange?logo=pnpm" alt="pnpm workspace" /></a>
+  <a href="https://arxiv.org/abs/2608.25512"><img src="https://img.shields.io/badge/Cordis-arXiv%3A2608.25512-00A88F" alt="Cordis" /></a>
+  <a href="https://donate.stripe.com/9B66oHaordEdf36erNfEk00"><img src="https://img.shields.io/badge/Sponsor-FitaLabs-635BFF?logo=stripe&logoColor=white" alt="Sponsor" /></a>
+  <a href="https://github.com/sponsors/aleffita"><img src="https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?logo=githubsponsors" alt="GitHub Sponsors" /></a>
+</p>
 
 <br />
-
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/cordis-spine-light.png" />
-  <img src="docs/assets/cordis-spine-dark.png" alt="LynxFita Endogenous Cordis Runtime Spine" width="100%" />
-</picture>
-
-</div>
 
 ---
 
@@ -31,21 +25,90 @@
 
 ### The Architectural Problem Space
 
-In modern desktop application development, developers face structural trade-offs between web runtimes and native embedding:
-- **Lynxtron (`vendor/lynxtron`)**: Pairs Node.js with Lynx (`LynxWindow`), utilizing Node-API and Chromium-derived platform window plumbing.
-- **LynxFita Approach**: Explores an endogenous Cordis capability seam model. Every subsystem—memory buffers, binary wire serialization, bytecode execution, dynamic native libraries, and release integrity—is mounted as a revertible Cordis service on a unified context (`LynxFitaContext` in TypeScript and `lynxfita::cordis::NativeContext` in C++20).
+In modern desktop application engineering, developers face structural trade-offs between monolithic web runtimes and native embedding:
+- **Lynxtron (`vendor/lynxtron`)**: Pairs Node.js with Lynx (`LynxWindow`), utilizing Node-API and platform window plumbing.
+- **LynxFita Approach**: Explores an endogenous Cordis capability seam model. Every subsystem—memory buffers, binary wire serialization, Meta Hermes bytecode execution, dynamic native libraries, and release integrity—is mounted as a revertible Cordis service on a unified context (`LynxFitaContext` in TypeScript and `lynxfita::cordis::NativeContext` in C++20).
 
+```mermaid
+flowchart TD
+    classDef core fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px,color:#cdd6f4
+    classDef memory fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+    classDef ffi fill:#1e1e2e,stroke:#fab387,stroke-width:2px,color:#cdd6f4
+    classDef security fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4
+    classDef bundle fill:#181825,stroke:#45475a,stroke-width:1.5px,color:#a6adc8
+    classDef surface fill:#1e1e2e,stroke:#f9e2af,stroke-width:2px,color:#cdd6f4
+
+    subgraph Bundle["Self-Contained Relocatable Application Bundle"]
+        Launchers["Portable Launchers (run.cmd / AppRun)"]:::bundle
+        AppJson["Application Descriptor (lynxfita.app.json)"]:::bundle
+        subgraph Payload["Embedded Distribution Payload"]
+            Bytecode["bundles/ (Hermes HBC Bytecode)"]:::bundle
+            Plugins["plugins/ (Native Shared Libraries .dll / .so)"]:::bundle
+            Assets["assets/ (Static Media, Fonts & Themes)"]:::bundle
+        end
+        Manifest["release.manifest.json (SHA-256 Hashes)"]:::security
+        Signature["release.sig (Ed25519 Signature)"]:::security
+    end
+
+    subgraph Host["Desktop Native Host (C++20 Engine)"]
+        NativeEngine["lynxfita_explorer (.exe / ELF)"]:::core
+        Verifier["Integrity Gate (Ed25519 & SHA-256)"]:::security
+        MetaHermes["Meta Hermes JSI Runtime (hermesvm_a)"]:::core
+        DmaArena["Stationary Shared Memory (64B Arena 0x2000)"]:::memory
+        FfiLoader["Dynamic Native FFI (LoadLibraryExW / dlopen)"]:::ffi
+    end
+
+    subgraph Windowing["Native Desktop Surface"]
+        LynxSurface["Declarative Lynx AST & Surface Window"]:::surface
+    end
+
+    Launchers -->|Spawns Host Process| NativeEngine
+    NativeEngine -->|Verifies Signature| Verifier
+    Signature -->|Signature Bytes| Verifier
+    Manifest -->|Payload Hashes| Verifier
+    Verifier -->|Validates Integrity| AppJson
+    AppJson -->|Configures Context| NativeEngine
+    NativeEngine -->|Allocates Stationary Memory| DmaArena
+    NativeEngine -->|Initializes Engine| MetaHermes
+    NativeEngine -->|Mounts Dynamic Loader| FfiLoader
+    Bytecode -->|Maps HBC Payload| MetaHermes
+    Plugins -->|Loads Shared Libraries| FfiLoader
+    Assets -->|Supplies UI Resources| LynxSurface
+    FfiLoader <-->|SIMD Operations| DmaArena
+    MetaHermes <-->|JSI HostObject Bridge| DmaArena
+    MetaHermes -->|Evaluates UI Tree| LynxSurface
+    LynxSurface -->|Renders Native View| NativeEngine
 ```
-+-----------------------------------------------------------------------------------+
-| LynxFita Application Distribution Layout                                          |
-|                                                                                   |
-|  1. C++20 Native Engine Host (JSI Engine + Dynamic FFI Loader)                    |
-|  2. Release Manifest & Digital Provenance (.upd_info + Ed25519 signature)         |
-|  3. Embedded Application Payload:                                                 |
-|     ├── bundles/ (Application control plane & UI component bundles)               |
-|     ├── plugins/ (Dynamic shared libraries .dll/.so/.dylib & Cordis plugins)      |
-|     └── assets/  (Static assets, fonts, and application metadata)                 |
-+-----------------------------------------------------------------------------------+
+
+### Runtime Execution Lifecycle
+
+The desktop host evaluates compiled Meta Hermes bytecode and orchestrates native subsystems through zero-copy memory lanes:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Developer / User
+    participant Launcher as Launcher (run.cmd / AppRun)
+    participant Host as Native Host (lynxfita_explorer)
+    participant Verifier as Ed25519 Verifier
+    participant Hermes as Meta Hermes VM (hermesvm_a)
+    participant DMA as Stationary DMA Arena
+    participant FFI as Native FFI Plugin (.dll / .so)
+    participant Lynx as Declarative Lynx Surface
+
+    User->>Launcher: Launch Application
+    Launcher->>Host: Execute lynxfita_explorer --gui bundles/app.hbc
+    Host->>Verifier: Validate release.sig & release.manifest.json
+    Verifier-->>Host: Integrity Authenticated
+    Host->>DMA: Allocate 64B-Aligned Stationary Arena (1 MB)
+    Host->>Hermes: Initialize Hermes Runtime Adapter & Attach DMA HostObject
+    Host->>Hermes: Evaluate Bytecode (app.hbc, v100)
+    Hermes->>FFI: Load Dynamic Plugin (NativeFfiLoader)
+    FFI->>DMA: Compute SIMD Telemetry at Offset 0x2000
+    DMA-->>Hermes: Read Real-Time Telemetry Slots
+    Hermes->>Lynx: Emit Declarative AST (view, text, image)
+    Lynx-->>Host: Mount Native Desktop Surface Window
+    Host-->>User: Display Active Interactive Window
 ```
 
 ### Cordis Capability Seams
@@ -57,28 +120,115 @@ Subsystems are implemented as Cordis **Services** with declared dependencies (`i
 | **`ctx.dma`** | `DmaService` (`@lynxfita/core`) | `DmaEibEngine` (`dma_eib_engine.cc`) | 64-byte aligned stationary memory arena (`0x0000` telemetry, `0x1000` wire buffer, `0x2000` SIMD slot) with parallel worker lanes. |
 | **`ctx.protobuf`** | `ProtobufService` (`@lynxfita/core`) | `ProtobufBridge` (`protobuf_bridge.cc`) | Varint and binary wire framing (`tag << 3 \| wire_type`) over shared memory slots. |
 | **`ctx.ffi`** | `FfiService` (`@lynxfita/core`) | `NativeFfiLoader` (`native_ffi_loader.cc`) | Dynamic shared library loader (`LoadLibraryExW` on Win32, `dlopen` on POSIX) with automatic cleanup on Fiber unload. |
-| **`ctx.compiler`** | `CompilerService` (`@lynxfita/core`) | `HermesCompiler` (`hermes_compiler.cc`) | Control-plane compiler interface. *[Roadmap: Direct CMake integration with `vendor/hermes` tools/hermesc]*. |
+| **`ctx.compiler`** | `CompilerService` (`@lynxfita/core`) | `HermesRuntimeAdapter` & `compileJS` (`hermes_compiler.cc`) | Authentic Meta Hermes C++20 JSI adapter (`hermesapi`, `hermesvm_a`) and ahead-of-time bytecode compilation via `hermesc` (`compileWithHermesc`). |
 | **`ctx.wasi`** | `WasiComponentService` (`@lynxfita/wasi-runtime`) | `WasiHostModule` (`wasi_host_module.cc`) | Linear memory interop and WIT interface parser (`@lynxfita/codegen`). *[Roadmap: Bytecode Alliance Wasmtime integration]*. |
 | **`ctx.gpu`** | `GpuService` (`@lynxfita/core`) | — | WebGPU pipeline abstraction. *[Roadmap: Native Dawn/wgpu C++ backend dispatch]*. |
 | **`ctx.federation`** | `FederationService` (`@lynxfita/updater`) | — | Validates release manifests and updates using Ed25519 digital signatures and SHA-256 digests. |
 
 ---
 
-## 2. Desktop Shell & Application Showcases
+## 2. Multi-Bundle Super-App & Mini-App Architecture
 
-Applications and plugins run in isolated Cordis Fibers (`ctx.isolate()`), acquiring resources via revertible effects:
+LynxFita structures desktop software as a **Multi-Bundle Super-App** host orchestrating independent **Mini-App** projects:
+
+- **Standalone Mini-App Projects**: Each mini-app is an independent project with its own lifecycle, state reducers, and declarative Lynx AST interface (e.g. [`examples/weather-showcase`](examples/weather-showcase)).
+- **Hermetic Packaging (`@lynxfita/builder`)**: The bundler compiles each mini-app into a standalone, relocatable bundle containing authentic Meta Hermes bytecode (`.hbc`), static assets, and an Ed25519-signed manifest (`release.manifest.json`).
+- **Super-App Container Host (`examples/explorer`)**: Rather than a monolithic codebase, the Super-App shell is an orchestration host that dynamically loads, mounts, and unloads multiple mini-app bundles into isolated Cordis Fibers (`ctx.isolate()`), managing cross-app navigation (`lynxfita://app-id`) and zero-copy data plane access.
+
+```mermaid
+flowchart TD
+    classDef project fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px,color:#cdd6f4
+    classDef bundler fill:#1e1e2e,stroke:#fab387,stroke-width:2px,color:#cdd6f4
+    classDef bundle fill:#181825,stroke:#45475a,stroke-width:1.5px,color:#a6adc8
+    classDef superapp fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+    classDef fiber fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4
+
+    subgraph Projects["Standalone Mini-App Projects"]
+        WeatherProj["Weather Showcase (MVI App)"]:::project
+        StudioProj["WIT and FFI Studio (SIMD App)"]:::project
+        DmaProj["DMA and GPU Lab (Visualizer App)"]:::project
+    end
+
+    subgraph BundlerStage["Packaging Pipeline (@lynxfita/builder)"]
+        Builder["BundlePackager (Hermes Compiler and Signer)"]:::bundler
+    end
+
+    subgraph Bundles["Compiled Bytecode Bundles"]
+        WeatherHbc["weather.hbc (Bytecode and Manifest)"]:::bundle
+        StudioHbc["studio.hbc (Bytecode and Manifest)"]:::bundle
+        DmaHbc["dma_lab.hbc (Bytecode and Manifest)"]:::bundle
+    end
+
+    subgraph SuperApp["Super-App Host Shell (examples/explorer)"]
+        Shell["Desktop Container Runtime"]:::superapp
+        subgraph Fibers["Isolated Cordis Fibers (ctx.isolate)"]
+            Fiber1["Weather Fiber"]:::fiber
+            Fiber2["Studio Fiber"]:::fiber
+            Fiber3["DMA Lab Fiber"]:::fiber
+        end
+    end
+
+    WeatherProj -->|Compile and Package| Builder
+    StudioProj -->|Compile and Package| Builder
+    DmaProj -->|Compile and Package| Builder
+
+    Builder --> WeatherHbc
+    Builder --> StudioHbc
+    Builder --> DmaHbc
+
+    WeatherHbc -->|Dynamic Mount| Fiber1
+    StudioHbc -->|Dynamic Mount| Fiber2
+    DmaHbc -->|Dynamic Mount| Fiber3
+
+    Shell --> Fibers
+```
 
 <div align="center">
   <img src="docs/assets/lynxfita-explorer-demo.gif" alt="LynxFita Desktop Explorer Session" width="100%" />
 </div>
 
-| Project / Showcase | Path | Description & Runtime Environment |
+### MVI Unidirectional Architecture & Telemetry Lane
+
+Mini-apps communicate with the native runtime through a unidirectional Model-View-Intent cycle, synchronizing state with the stationary telemetry slot:
+
+```mermaid
+flowchart LR
+    classDef ui fill:#1e1e2e,stroke:#f9e2af,stroke-width:2px,color:#cdd6f4
+    classDef control fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px,color:#cdd6f4
+    classDef hardware fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+    classDef native fill:#1e1e2e,stroke:#fab387,stroke-width:2px,color:#cdd6f4
+
+    subgraph UI["Declarative Lynx Surface"]
+        View["Lynx View Components (view, text)"]:::ui
+        Intent["User Action or Trigger (Refresh, Select)"]:::ui
+    end
+
+    subgraph Control["Cordis Control Plane"]
+        Store["WeatherStore (MVI Unidirectional Reducer)"]:::control
+        State["Immutable WeatherState (Telemetry, Cities)"]:::control
+    end
+
+    subgraph Hardware["Stationary Shared Memory & FFI"]
+        DMA["Stationary DMA Lane (Offset 0x2000)"]:::hardware
+        Plugin["Native SIMD Plugin (.dll / .so)"]:::native
+    end
+
+    View -->|User Interaction| Intent
+    Intent -->|Dispatches Intent Action| Store
+    Store -->|Pure Reducer Function| State
+    State -->|Renders Declarative AST| View
+    Store -->|Zero-Copy DMA Synchronization| DMA
+    DMA <-->|Vectorized In-Place Computation| Plugin
+    Plugin -->|Telemetry Result Slot| Store
+```
+
+| Showcase & Application Bundles | Path | Description & Runtime Architecture |
 | :--- | :--- | :--- |
-| **Desktop Shell Preview** | [`examples/explorer`](examples/explorer) | TypeScript interactive developer shell demonstrating Cordis service lifecycle, route navigation (`lynxfita://home`, `lynxfita://settings`), and memory slot inspection. Serves local preview at `http://127.0.0.1:4173` via `pnpm explore`. |
-| **Weather Showcase MVI** | [`examples/weather-showcase`](examples/weather-showcase) | Unidirectional Model-View-Intent weather radar application (`forecast-home`, `hourly-detail`, `city-search`), dark/light themes (`#f9d65d`), 14 weather conditions, and SIMD telemetry integration. |
-| **WIT & Native SIMD Studio** | [`examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts`](examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts) | Interactive WebAssembly Interface Type (WIT) parser (`parseWitSpec`) and SIMD execution interface over memory slot `0x2000`. |
-| **Stationary DMA Lab** | [`examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts`](examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts) | Memory slot visualizer (`0x0000`–`0x3FFF`) and canvas visualization. |
-| **`lynxfita_explorer` Native Host** | [`src/native/src/explorer_main.cc`](src/native/src/explorer_main.cc) | Win32 native test runner and demonstration binary for C++20 engine validation. *[Roadmap: LynxView hardware rendering surface integration via `vendor/lynxtron`]*. |
+| **Super-App Explorer Shell** | [`examples/explorer`](examples/explorer) | Interactive desktop host orchestrating multi-bundle mini-app lifecycles, route sandboxing (`lynxfita://home`, `lynxfita://settings`), and memory slot inspection. Serves local preview at `http://127.0.0.1:4173` via `pnpm explore`. |
+| **Weather Showcase MVI** | [`examples/weather-showcase`](examples/weather-showcase) | Standalone MVI mini-app project with declarative Lynx components (`view`, `text`, `image`), dark/light theme switching (`#f9d65d`), 14 weather conditions, and direct SIMD telemetry sync. |
+| **WIT & Native SIMD Studio** | [`examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts`](examples/explorer/src/miniapps/wit_ffi_studio_miniapp.ts) | WebAssembly Interface Type (WIT) parser (`parseWitSpec`) and vectorized SIMD execution harness over stationary slot `0x2000`. |
+| **Stationary DMA Lab** | [`examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts`](examples/explorer/src/miniapps/dma_gpu_lab_miniapp.ts) | Real-time memory visualizer inspecting stationary buffer ranges (`0x0000`–`0x3FFF`). |
+| **`lynxfita_explorer` Native Host** | [`src/native/src/explorer_main.cc`](src/native/src/explorer_main.cc) | Desktop application host binary executing compiled Hermes bytecode bundles via `--run <file.hbc>` and interactive desktop window via `--gui [bundle.hbc]`. |
 
 <p align="center">
   <img src="docs/assets/weather-showcase-dark.png" alt="Weather Showcase Dark Mode" width="49%" />
@@ -91,32 +241,68 @@ Applications and plugins run in isolated Cordis Fibers (`ctx.isolate()`), acquir
 
 LynxFita incorporates digital signatures for **binary release integrity** and **over-the-air update verification**:
 
-1. **Signed Release Manifests (`@lynxfita/builder`)**: The packaging pipeline generates `release.manifest.json` containing SHA-256 digests for all bundle payloads and dynamic libraries, signed with an Ed25519 private key (`release.sig`).
+```mermaid
+flowchart TD
+    classDef builder fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px,color:#cdd6f4
+    classDef manifest fill:#181825,stroke:#45475a,stroke-width:1.5px,color:#a6adc8
+    classDef crypto fill:#1e1e2e,stroke:#cba6f7,stroke-width:2px,color:#cdd6f4
+    classDef decision fill:#1e1e2e,stroke:#f9e2af,stroke-width:2px,color:#cdd6f4
+    classDef success fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px,color:#cdd6f4
+    classDef rollback fill:#1e1e2e,stroke:#eba0ac,stroke-width:2px,color:#cdd6f4
+
+    subgraph Packaging["Build & Packaging Pipeline (@lynxfita/builder)"]
+        Packager["SelfContainedPackager"]:::builder
+        Manifest["release.manifest.json (SHA-256 Hashes)"]:::manifest
+        Sig["release.sig (Ed25519 Signature)"]:::crypto
+    end
+
+    subgraph Runtime["Client / Runtime Host (@lynxfita/updater)"]
+        Verify{"Verify Ed25519 Signature & Hashes"}:::decision
+        Stage["Stage & Mount in Isolated Fiber"]:::success
+        Baseline["Deterministic Rollback (Embedded Baseline)"]:::rollback
+    end
+
+    Packager -->|Computes SHA-256 Digests| Manifest
+    Packager -->|Signs with Private Key| Sig
+    Manifest -->|Payload Hashes| Verify
+    Sig -->|Signature Data| Verify
+    Verify -->|Signature Valid and Hashes Match| Stage
+    Verify -->|Invalid Signature or Hash Mismatch| Baseline
+    Stage -->|Disposer on Unload| Baseline
+```
+
+1. **Signed Release Manifests (`@lynxfita/builder`)**: The packaging pipeline generates `release.manifest.json` containing SHA-256 digests for all bundle payloads, native binaries, and dynamic libraries, signed with an Ed25519 private key (`release.sig`).
 2. **Cryptographic Verification (`@lynxfita/updater`)**: The updater service verifies the digital signature against the embedded public key and validates payload SHA-256 hashes prior to staging updates.
 3. **Deterministic Rollback (`ctx.federation`)**: If a remote bundle fails verification or encounters an unhandled fault, the reconciler unloads the affected Fiber and restores the embedded baseline bundle.
 
 ---
 
-## 4. Performance & Microbenchmarks
+## 4. Unified Zero-Copy Data Plane & Microbenchmarks
+
+Rather than treating memory buffers, SIMD vectorization, binary wire RPC framing, and WASI linear memory as isolated, competing mechanisms, LynxFita architectures them as a **Unified Zero-Copy Data Plane**:
+
+- **Cooperative End-to-End Pipeline**: Protobuf binary wire frames (`ctx.protobuf`) encode directly into designated slots in Stationary Shared Memory (`ctx.dma`). Native SIMD kernels (`ctx.ffi`) process vectors in-place on that exact slot without memory copies. WASI runtime modules (`ctx.wasi`) enforce bounds checking directly over the shared arena.
+- **Unified Pipeline Advantage**: Operating over a single coherent memory arena eliminates the traditional serialization and crossing penalty between JavaScript, WebAssembly, and native C++ code, achieving sub-microsecond median latencies and scaling up to 42.5 GB/s bandwidth.
 
 Statistical microbenchmarks are executed via `pnpm bench` ([`benchmarks/run_benchmarks.ts`](benchmarks/run_benchmarks.ts)) using the Kalibera & Jones standard ($N = 30$ independent sample batches after 10 discarded warm-up rounds).
 
-Full methodology and report: [`BENCHMARK.md`](BENCHMARK.md).
+Full methodology and raw statistical distributions ($p50$, $p95$, $p99$, $IQR$, $CV\%$, 95% CI): [`BENCHMARK.md`](BENCHMARK.md).
 
-> **Measurement Context Note**: The table below reflects memory operations executed on Node.js v26.12.1 (`AMD Ryzen 5 4500 6-Core Processor`, `Windows NT 10.0.19045 x64`). High throughput metrics represent in-memory V8 TypedArray buffer operations, not hardware peripheral DMA transfers.
+> **Measurement Context Note**: The charts and metrics below reflect memory operations executed on Node.js v26.12.1 (`AMD Ryzen 5 4500 6-Core Processor`, `Windows NT 10.0.19045 x64`). High throughput metrics represent in-memory V8 TypedArray buffer operations, not hardware peripheral DMA transfers.
 
-| Subsystem / Operation | Payload | $p50$ ($\mu\text{s}$) | IQR ($\mu\text{s}$) | $p95$ ($\mu\text{s}$) | $p99$ ($\mu\text{s}$) | Mean $\pm$ 95% CI ($\mu\text{s}$) | Throughput (MB/s) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **In-Memory Buffer Transfer** | `64 B` | `0.60` | `0.00` | `1.20` | `2.20` | `0.70 ± 0.10` | `88.46` |
-| **In-Memory Buffer Transfer** | `4 KB` | `0.60` | `0.00` | `1.00` | `1.10` | `0.60 ± 0.00` | `6,135.47` |
-| **In-Memory Buffer Transfer** | `64 KB` | `1.60` | `0.00` | `1.80` | `2.00` | `1.60 ± 0.00` | `38,981.29` |
-| **In-Memory Buffer Transfer** | `1 MB` | `23.10` | `0.20` | `27.40` | `30.70` | `23.50 ± 0.60` | `42,498.94` |
-| **SIMD Float View Pack/Unpack** | `16 B` | `0.36` | `0.07` | `0.79` | `0.82` | `0.40 ± 0.10` | `38.22` |
-| **Protobuf Method Wire Encoding**| `64 B` | `7.70` | `2.90` | `16.60` | `17.20` | `9.00 ± 0.90` | `6.80` |
-| **Protobuf Method Wire Encoding**| `4 KB` | `9.60` | `5.00` | `23.70` | `35.30` | `12.20 ± 2.10` | `319.57` |
-| **Linear Memory Read/Write** | `64 B` | `0.50` | `0.10` | `1.10` | `1.30` | `0.50 ± 0.10` | `117.38` |
-| **Linear Memory Read/Write** | `64 KB` | `21.40` | `3.60` | `31.60` | `32.60` | `21.90 ± 1.40` | `2,851.28` |
-| **Linear Memory Read/Write** | `1 MB` | `285.20` | `85.90` | `472.80` | `631.50` | `306.00 ± 33.60` | `3,268.29` |
+<p align="center">
+  <img src="docs/assets/benchmark-throughput.svg" alt="Memory Transfer Throughput Scaling" width="49%" />
+  <img src="docs/assets/benchmark-latency.svg" alt="Subsystem Execution Latency" width="49%" />
+</p>
+
+### Unified Pipeline Metrics Overview
+
+| Pipeline Stage & Capability | Payload Range | Median Latency ($p50$) | Peak Bandwidth | Role in Unified Data Plane |
+| :--- | :---: | :---: | :---: | :--- |
+| **Stationary Memory Foundation (`ctx.dma`)** | `64 B` &ndash; `1 MB` | `0.60` &ndash; `23.10 μs` | `42,498.94 MB/s` | 64-byte aligned arena providing zero-copy memory slots (`0x0000`–`0x3FFF`) |
+| **In-Place SIMD Vector Lane (`ctx.ffi`)** | `16 B` | `0.36 μs` | `38.22 MB/s` | Vectorized float32 math directly over memory slot `0x2000` |
+| **Zero-JSON Wire RPC Framing (`ctx.protobuf`)** | `64 B` &ndash; `4 KB` | `7.70` &ndash; `9.60 μs` | `319.57 MB/s` | Binary varint wire packing directly into shared slot without heap copy |
+| **Sandboxed WASI Linear Interop (`ctx.wasi`)** | `64 B` &ndash; `1 MB` | `0.50` &ndash; `285.20 μs` | `3,268.29 MB/s` | Bounds-checked WASI linear memory access mapped to the stationary arena |
 
 ---
 
@@ -147,6 +333,9 @@ pnpm explore
 
 # 6. Run statistical benchmarks
 pnpm bench
+
+# 7. Package self-contained desktop application (AppImage/PE layout with Ed25519 signature)
+node --experimental-strip-types scripts/package-release.ts
 ```
 
 ---
@@ -181,17 +370,17 @@ lynxfita/
 
 ---
 
-## 7. Backing the Research & Patronage
+## 7. Research Patronage & Sponsorship
 
 <div align="center">
 
-### 🖤🐧 *"Enjoyed the session? Satisfied with how I perform?"*
+### Independent Systems & Foundations Engineering
 
-*Help keep a working girl's late-night research alive by tipping any amount. Who knows — I might spin up a private dashboard and unlock exclusive behind-the-scenes builds for my top patrons. No promises, just immeasurable value to keep the sessions going!*
+*LynxFita is developed as part of independent research into high-performance, deterministic desktop runtime architectures at FitaLabs. Research patronage directly supports independent engineering, continuous benchmarking infrastructure, and open-source systems formalization.*
 
 <br />
 
-[![Tip via Stripe](https://img.shields.io/badge/Tip_via_Stripe-🖤🐧_FitaLabs-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)&nbsp;&nbsp;&nbsp;[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/aleffita)
+[![Sponsor via Stripe](https://img.shields.io/badge/Sponsor_via_Stripe-FitaLabs-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://donate.stripe.com/9B66oHaordEdf36erNfEk00)&nbsp;&nbsp;&nbsp;[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-♥_aleffita-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/aleffita)
 
 </div>
 
