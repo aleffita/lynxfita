@@ -82,4 +82,15 @@ test('CockpitStore manages A2UI dynamic agent surface and user action routing', 
 
   await store.getRenderer().dispatchAction('btn-compile', 'onPress');
   assert.ok(actionFired, 'A2UI user action must be received by listener');
+
+  // Test state machine synchronization
+  store.setTab('statemachine');
+  const initialRound = store.getState().stateMachine.consensusRound;
+  store.syncStateMachine();
+  const nextRound = store.getState().stateMachine.consensusRound;
+  assert.equal(nextRound, initialRound + 1);
+  assert.ok(store.getState().stateMachine.lastRoll >= 3 && store.getState().stateMachine.lastRoll <= 18);
+
+  const smHtml = await explorer.renderHtmlPage();
+  assert.ok(smHtml.includes(`Round ${nextRound}`));
 });

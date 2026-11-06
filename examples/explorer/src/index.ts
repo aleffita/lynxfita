@@ -312,6 +312,13 @@ export class SuperAppExplorer {
       }).then(() => window.location.reload());
     };
 
+    window.cockpitSyncStateMachine = function() {
+      fetch('/api/cockpit/statemachine/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }).then(() => window.location.reload());
+    };
+
     document.addEventListener('click', function(e) {
       const tabBtn = e.target.closest('.cockpit-tab-btn');
       if (tabBtn && tabBtn.dataset.tab) {
@@ -328,6 +335,10 @@ export class SuperAppExplorer {
       }
       if (e.target.id === 'btn-compile-now') {
         window.cockpitCompileSnippet();
+        return;
+      }
+      if (e.target.id === 'btn-sync-state-machine') {
+        window.cockpitSyncStateMachine();
         return;
       }
       const a2uiBtn = e.target.closest('[data-a2ui-action]');

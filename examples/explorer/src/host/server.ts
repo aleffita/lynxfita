@@ -151,6 +151,18 @@ export function startExplorerServer(port = 4173): Promise<{ close: () => Promise
               return;
             }
 
+            if (url.pathname === '/api/cockpit/statemachine/sync') {
+              await explorer.ensureMiniAppLaunched('developer-cockpit');
+              const store = explorer.getCockpitStore();
+              if (store) {
+                store.syncStateMachine();
+                explorer.historyManager.log('cordis', `Advanced state consensus round to ${store.getState().stateMachine.consensusRound}`);
+              }
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, stateMachine: store?.getState().stateMachine }));
+              return;
+            }
+
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Endpoint not found' }));
           } catch (err: any) {

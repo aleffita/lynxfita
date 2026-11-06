@@ -74,9 +74,26 @@ The **Grand Unified Cockpit** resolves these fractures by anchoring all operatio
 
 ---
 
-## 2. ByteDance / Lynx A2UI v0.9 Specification Integration
+## 2. Upstream ByteDance Concepts & Architectural Synthesis
 
-Following the official ByteDance and Google Lynx GenUI standards (`vendor/lynx-website/docs/en/react/genui/a2ui.mdx`), [`@lynxfita/genui`](file:///j:/limiar/packages/lynxfita/packages/genui) enforces a catalog-constrained UI generation pipeline:
+An exhaustive audit of the vendorized documentation (`vendor/lynx-website`) surfaces three foundational upstream concepts that anchor our multi-repo and agentic cockpit architecture:
+
+### A. External Bundle & Cross-Application Reuse
+In `vendor/lynx-website/docs/en/guide/build/external-bundle.mdx`:
+- **Problem**: Monolithic desktop applications duplicate core dependencies and require monolithic redeployments for independent mini-apps.
+- **ByteDance Solution**: The **External Bundle** architecture compiles standalone `.lynx.bundle` modules using `@lynx-js/lynx-bundle-rslib-config` and loads them at runtime across multiple Lynx apps via `@lynx-js/external-bundle-rsbuild-plugin` and `lynx.fetchBundle` (`FetchBundle` code-splitting).
+- **LynxFita Adaptation**: `@lynxfita/builder` produces relocatable HBC bytecode bundles, and `@lynxfita/updater` acts as the cryptographic transport and reconciler, providing zero-downtime hot-swapping inside isolated Cordis Fibers.
+
+### B. Lynx DevTool MCP Server (Agent & Human Unified DX)
+In `vendor/lynx-website/docs/en/ai/lynx-devtool-mcp.mdx`:
+- **Problem**: Developer tooling is historically designed exclusively for humans (GUIs) or exclusively for CLI scripts, forcing artificial divergence between human workflows and autonomous coding agents.
+- **ByteDance Solution**: The `@lynx-js/devtool-mcp-server` exposes Chrome DevTools Protocol (CDP) over Model Context Protocol (MCP), enabling AI coding agents to inspect the DOM/CSS hierarchy, execute console evaluation, capture screenshots, and emulate UI interaction alongside human engineers.
+- **LynxFita Adaptation**: The Developer Cockpit (`lynxfita://miniapp/developer-cockpit`) hosts REST/CDP automation endpoints (`/api/cockpit/*`), providing a unified interface equally operable by human engineers via browser UI and by autonomous agents via structured JSON commands.
+
+### C. Generative UI: A2UI v0.9 & OpenUI Lang
+In `vendor/lynx-website/docs/en/react/genui/a2ui.mdx` and `openui.mdx`:
+- **Dual Formats**: A2UI provides flat, catalog-constrained JSON messages for structured card composition, while OpenUI provides compact, line-oriented streaming notation (`root = Stack([title, metric])`) for real-time generative feeds.
+- **LynxFita Adaptation**: [`@lynxfita/genui`](file:///j:/limiar/packages/lynxfita/packages/genui) implements the A2UI v0.9 specification against [`LynxFitaCockpitCatalog`](file:///j:/limiar/packages/lynxfita/packages/genui/src/catalog.ts), ensuring AI agents compose dynamic cockpits without generating unconstrained or dangerous executable scripts.
 
 ```mermaid
 sequenceDiagram
