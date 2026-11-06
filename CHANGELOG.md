@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.0] - 2026-11-05
+
+### Added
+- **Authentic Meta Hermes C++20 JSI Engine (`src/native`, `vendor/hermes`)**:
+  - Direct integration and linking of Meta Hermes libraries (`hermesapi`, `hermesvm_a`, `jsi`) and `compileJS` from upstream `vendor/hermes`.
+  - Deprecated simulated 10-opcode interpreter (`hermes_runtime_adapter.cc`) and Shunting-yard regex parser (`hermes_compiler.cc`), replacing them with Meta Hermes VM (`hermes::vm::Runtime`) and authentic Hermes Bytecode Compiler (`compileWithHermesc`).
+  - Added binary validation for authentic Hermes bytecode header (`0x1F1903C103BC1FC6`, v100).
+- **Lynxtron Desktop Host & Declarative Lynx View Engine (`src/native/src/explorer_main.cc`, `examples/weather-showcase`)**:
+  - Deprecated Win32 GDI `DrawTextW` text drawing facade; replaced with native desktop canvas host executing bytecode via `--run <file.hbc>` and `--gui [bundle.hbc]`.
+  - Upgraded `examples/weather-showcase` to produce declarative Lynx AST components (`<view>`, `<text>`, `<image>`) adhering to `@lynx-js/react` and Lynxtron desktop template standards.
+- **Authentic Self-Contained Desktop Application Packager (`@lynxfita/builder`, `@lynxfita/cli`, `.github/workflows/release.yml`)**:
+  - Implemented AppImage (Type 2) / Portable PE packaging layout in `SelfContainedPackager`:
+    - Bundles native desktop host executable (`lynxfita_explorer.exe` on Windows, `lynxfita_explorer` on POSIX)
+    - Bundles dynamic native FFI plugins (`plugins/lynxfita_weather_simd_plugin.dll` / `.so`)
+    - Bundles compiled Meta Hermes bytecode (`bundles/weather-showcase.hbc`) and manifest
+    - Emits portable launchers: Windows (`run.cmd`) and POSIX (`AppRun`)
+    - Recursively digests all packaged distribution files in `release.manifest.json` with Ed25519 digital signature (`release.sig`) and public key (`release.pub`)
+  - Extended CLI doctor diagnostics for CMake and Hermesc compiler availability.
+  - Modernized `.github/workflows/release.yml` to produce authentic self-contained desktop release archives.
+
+---
+
 ## [2.2.0] - 2026-11-05
 
 ### Added
